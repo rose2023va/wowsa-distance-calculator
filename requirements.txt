@@ -1,4 +1,4 @@
-searoute
+git+https://github.com/rose2023va/searoute-py.git
 gpxpy
 flask
 flask-cors
