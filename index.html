@@ -267,7 +267,8 @@ const S = {
   mapInstance:     null,
   aiShoreWaypoints: [],    // [{lat, lon}] for AI-routed shore-to-shore path
   aiShoreMarkers:   [],
-  endpointMarkers:  [],
+  startMarker:      null,
+  endMarker:        null,
 };
 
 // ── Coord parsing ──────────────────────────────────────────────────────────────
@@ -434,7 +435,8 @@ function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, glo
   const label = globeRouted ? `Swimmable distance (GLOBE Dijkstra - verified${swimName ? ': ' + swimName : ''})`
               : seaRouted   ? 'Swimmable distance (sea route)'
               : aiRouted    ? 'Swimmable distance (AI water path)'
-              :                'Point-to-point distance (straight line)';
+              : warning     ? 'Reference distance (land crossing detected)'
+              :               'Swimmable distance';
   document.getElementById('result-type-label').textContent = label;
   document.getElementById('result-km').textContent = f(km, 3) + ' km / ' + f(mi, 3) + ' mi';
   document.getElementById('result-mi').textContent = '';
@@ -730,8 +732,8 @@ function getMap(center, zoom) {
   S.wpMarkers = [];
   S.aiShoreMarkers.forEach(m => m.setMap(null));
   S.aiShoreMarkers = [];
-  S.endpointMarkers.forEach(m => m.setMap(null));
-  S.endpointMarkers = [];
+  if (S.startMarker) { S.startMarker.setMap(null); S.startMarker = null; }
+  if (S.endMarker)   { S.endMarker.setMap(null);   S.endMarker   = null; }
   return S.mapInstance;
 }
 
@@ -747,8 +749,8 @@ function drawSeaRoute(coords, start, end) {
     path, map, geodesic: false,
     strokeColor: '#58a6ff', strokeOpacity: 0.9, strokeWeight: 3,
   });
-  S.endpointMarkers.push(new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' }));
-  S.endpointMarkers.push(new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   }));
+  S.startMarker = new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' });
+  S.endMarker   = new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   });
   const b = new google.maps.LatLngBounds();
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
@@ -763,8 +765,8 @@ function drawGlobeShoreRoute(coords, start, end) {
     path, map, geodesic: false,
     strokeColor: '#3fb950', strokeOpacity: 0.9, strokeWeight: 3,
   });
-  S.endpointMarkers.push(new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' }));
-  S.endpointMarkers.push(new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   }));
+  S.startMarker = new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' });
+  S.endMarker   = new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   });
   const b = new google.maps.LatLngBounds();
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
@@ -783,8 +785,8 @@ function drawGeodesic(start, end, reason) {
     icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
               offset: '0', repeat: '10px' }],
   });
-  S.endpointMarkers.push(new google.maps.Marker({ position: s, map, icon: markerIcon('#3fb950'), title: 'Start' }));
-  S.endpointMarkers.push(new google.maps.Marker({ position: e, map, icon: markerIcon('#f85149'), title: 'End'   }));
+  S.startMarker = new google.maps.Marker({ position: s, map, icon: markerIcon('#3fb950'), title: 'Start' });
+  S.endMarker   = new google.maps.Marker({ position: e, map, icon: markerIcon('#f85149'), title: 'End'   });
   const b = new google.maps.LatLngBounds();
   b.extend(s); b.extend(e);
   map.fitBounds(b);
@@ -801,8 +803,8 @@ function drawAiShoreRoute(coords, start, end) {
     strokeColor: '#d29922', strokeOpacity: 0.9, strokeWeight: 3,
   });
   // Fixed start/end markers
-  S.endpointMarkers.push(new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' }));
-  S.endpointMarkers.push(new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   }));
+  S.startMarker = new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' });
+  S.endMarker   = new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   });
 
   // Draggable intermediate markers - user can correct AI mistakes
   S.aiShoreWaypoints = coords.map(c => ({ lat: c[1], lon: c[0] }));

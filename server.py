@@ -249,8 +249,10 @@ def api_calculate():
         if needs_ai:
             km = _haversine_km(origin[1], origin[0], dest[1], dest[0])
             direct = [origin, dest]
-            seg_problems, _ = _check_segments_land(direct)
-            if not seg_problems:
+            # Check only the interior of the path - coastal endpoints touching land are
+            # expected (swimmer enters/exits from the beach) and are not a problem.
+            land_in_middle = _interior_crosses_land(origin, dest)
+            if not land_in_middle:
                 out = {
                     'distance_km':    round(km, 3),
                     'distance_miles': round(km_to_miles(km), 3),
@@ -267,7 +269,7 @@ def api_calculate():
                 'coordinates':    direct,
                 'sea_routed':     False,
                 'ai_routed':      False,
-                'warning':        'Land detected on direct path. Straight-line distance shown. This route requires a pre-computed GLOBE route for an accurate swimmable distance.',
+                'warning':        'Route crosses land. Straight-line shown as reference - actual swimmable path will be longer.',
             }
             return jsonify(out)
 
@@ -461,6 +463,28 @@ def _check_segments_land(waypoints):
         return seg_problems, on_land_wps
     except Exception:
         return [], []
+
+
+def _interior_crosses_land(wpt_a, wpt_b, n=20):
+    """Check only the interior of the path between two [lon, lat] points for land.
+    Skips the first and last 15% of samples so coastal start/end coordinates
+    (on a beach or harbour) don't trigger a false positive."""
+    if not _ensure_land_data():
+        return False
+    try:
+        from shapely.geometry import Point
+        lon1, lat1 = float(wpt_a[0]), float(wpt_a[1])
+        lon2, lat2 = float(wpt_b[0]), float(wpt_b[1])
+        skip = max(1, int(n * 0.15))
+        for i in range(skip, n - skip + 1):
+            t   = i / n
+            lon = lon1 + t * (lon2 - lon1)
+            lat = lat1 + t * (lat2 - lat1)
+            if _is_on_land(lon, lat):
+                return True
+        return False
+    except Exception:
+        return False
 
 
 @app.route('/api/circumnavigate', methods=['POST'])
