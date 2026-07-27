@@ -1,5 +1,4 @@
 # WOWSA Route Distance Calculator: Technical Brief
-*For Quinn's call with Anthony Goddard, ZeroSixZero*
 
 ---
 
@@ -67,15 +66,15 @@ Circumnavigation in tight spaces is still the trickiest problem. When the water 
 
 ## What we have so far
 
-All files are in the `swimmable-distance/` folder of the GitHub repo.
+All files are in the [wowsa-distance-calculator](https://github.com/rose2023va/wowsa-distance-calculator) repository.
 
 | File | What it does |
 |---|---|
-| `calculate.py` | Core shore-to-shore distance engine. Runs searoute, validates the result, falls back to AI or haversine if needed. |
-| `circumnavigation.py` | Takes an ordered list of waypoints and calculates total loop distance, leg by leg. |
-| `propose-waypoints.py` | Generates initial offshore waypoints for a circumnavigation using OSMnx island boundary + 900m buffer. |
-| `map_output.py` | Outputs the calculated route as a Google Maps link for visual verification. |
-| `server.py` | Local Flask server that exposes the calculation and waypoint logic as API endpoints for the web interface. |
-| `index.html` | Web interface with an interactive map. Runs against the local server. |
-| `METHODOLOGY.md` | Documents the routing methodology and validation logic. |
-| `requirements.txt` | Python dependencies. |
+| [calculate.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/calculate.py) | Core shore-to-shore distance engine. Runs searoute, validates the result, falls back to AI or haversine if needed. |
+| [circumnavigation.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/circumnavigation.py) | Takes an ordered list of waypoints and calculates total loop distance, leg by leg. |
+| [propose-waypoints.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/propose-waypoints.py) | Generates initial offshore waypoints for a circumnavigation using OSMnx island boundary + 900m buffer. |
+| [map_output.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/map_output.py) | Outputs the calculated route as a Google Maps link for visual verification. |
+| [server.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/server.py) | Flask server that exposes the calculation and waypoint logic as API endpoints for the web interface. |
+| [index.html](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/index.html) | Web interface with an interactive map. |
+| [METHODOLOGY.md](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/METHODOLOGY.md) | Documents the routing methodology and validation logic. |
+| [requirements.txt](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/requirements.txt) | Python dependencies. |
