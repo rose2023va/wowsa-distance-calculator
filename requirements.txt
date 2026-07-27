@@ -9,3 +9,4 @@ numpy
 osmnx
 pyproj
 psycopg2-binary
+global-land-mask

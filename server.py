@@ -60,19 +60,22 @@ def _db_init():
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS shore_routes (
-                    id            SERIAL PRIMARY KEY,
-                    start_lat     DOUBLE PRECISION NOT NULL,
-                    start_lon     DOUBLE PRECISION NOT NULL,
-                    end_lat       DOUBLE PRECISION NOT NULL,
-                    end_lon       DOUBLE PRECISION NOT NULL,
-                    distance_km   DOUBLE PRECISION NOT NULL,
+                    id             SERIAL PRIMARY KEY,
+                    start_lat      DOUBLE PRECISION NOT NULL,
+                    start_lon      DOUBLE PRECISION NOT NULL,
+                    end_lat        DOUBLE PRECISION NOT NULL,
+                    end_lon        DOUBLE PRECISION NOT NULL,
+                    distance_km    DOUBLE PRECISION NOT NULL,
                     distance_miles DOUBLE PRECISION NOT NULL,
-                    path          JSONB,
-                    route_type    VARCHAR(20),
-                    warning       TEXT,
-                    created_at    TIMESTAMP DEFAULT NOW()
+                    path           JSONB,
+                    route_type     VARCHAR(20),
+                    warning        TEXT,
+                    name           VARCHAR(200),
+                    created_at     TIMESTAMP DEFAULT NOW()
                 )
             """)
+            # Migration: add name column to existing tables
+            cur.execute("ALTER TABLE shore_routes ADD COLUMN IF NOT EXISTS name VARCHAR(200)")
             conn.commit()
         print('DB ready.')
     except Exception as e:
@@ -88,14 +91,14 @@ def _db_lookup(start_lat, start_lon, end_lat, end_lon, tolerance_km=0.5):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT start_lat, start_lon, end_lat, end_lon,
-                       distance_km, distance_miles, path, route_type, warning
+                       distance_km, distance_miles, path, route_type, warning, name
                 FROM shore_routes
                 WHERE ABS(start_lat - %s) < 0.01 AND ABS(start_lon - %s) < 0.01
                   AND ABS(end_lat   - %s) < 0.01 AND ABS(end_lon   - %s) < 0.01
             """, (start_lat, start_lon, end_lat, end_lon))
             rows = cur.fetchall()
         for row in rows:
-            slat, slon, elat, elon, km, mi, path, rtype, warn = row
+            slat, slon, elat, elon, km, mi, path, rtype, warn, name = row
             forward = (_haversine_km(start_lat, start_lon, slat, slon) < tolerance_km and
                        _haversine_km(end_lat,   end_lon,   elat, elon) < tolerance_km)
             reverse = (_haversine_km(start_lat, start_lon, elat, elon) < tolerance_km and
@@ -112,6 +115,8 @@ def _db_lookup(start_lat, start_lon, end_lat, end_lon, tolerance_km=0.5):
                     'ai_routed':      False,
                     'globe_routed':   rtype == 'globe',
                     'warning':        warn,
+                    'swim_name':      name,
+                    'from_db':        True,
                 }
         return None
     except Exception as e:
@@ -120,7 +125,7 @@ def _db_lookup(start_lat, start_lon, end_lat, end_lon, tolerance_km=0.5):
     finally:
         conn.close()
 
-def _db_save(start_lat, start_lon, end_lat, end_lon, result, route_type):
+def _db_save(start_lat, start_lon, end_lat, end_lon, result, route_type, name=''):
     conn = _db_conn()
     if not conn:
         return
@@ -129,14 +134,15 @@ def _db_save(start_lat, start_lon, end_lat, end_lon, result, route_type):
             cur.execute("""
                 INSERT INTO shore_routes
                     (start_lat, start_lon, end_lat, end_lon,
-                     distance_km, distance_miles, path, route_type, warning)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     distance_km, distance_miles, path, route_type, warning, name)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 start_lat, start_lon, end_lat, end_lon,
                 result['distance_km'], result['distance_miles'],
                 json.dumps(result.get('coordinates')),
                 route_type,
                 result.get('warning'),
+                name or None,
             ))
             conn.commit()
     except Exception as e:
@@ -205,85 +211,199 @@ def _precomputed_shore_route(start_lat, start_lon, end_lat, end_lon):
     return None
 
 
+def _globe_route_on_demand(start_lat, start_lon, end_lat, end_lon):
+    """A* pathfinding through a GLOBE land-mask water grid for any coordinate pair."""
+    try:
+        from global_land_mask import globe
+        import numpy as np
+        import heapq
+        from calculate import km_to_miles
+
+        straight_km = _haversine_km(start_lat, start_lon, end_lat, end_lon)
+
+        # Adaptive resolution and padding based on crossing distance
+        if straight_km < 100:
+            res, pad = 0.010, 1.0
+        elif straight_km < 400:
+            res, pad = 0.020, 1.5
+        else:
+            res, pad = 0.050, 2.0
+
+        lat_min = min(start_lat, end_lat) - pad
+        lat_max = max(start_lat, end_lat) + pad
+        lon_min = min(start_lon, end_lon) - pad
+        lon_max = max(start_lon, end_lon) + pad
+
+        lats = np.arange(lat_min, lat_max + res / 2, res)
+        lons = np.arange(lon_min, lon_max + res / 2, res)
+        nrows, ncols = len(lats), len(lons)
+
+        # Guard against huge grids
+        if nrows * ncols > 600_000:
+            factor = int(np.ceil(np.sqrt(nrows * ncols / 600_000)))
+            res *= factor
+            lats = np.arange(lat_min, lat_max + res / 2, res)
+            lons = np.arange(lon_min, lon_max + res / 2, res)
+            nrows, ncols = len(lats), len(lons)
+
+        # Vectorised water mask
+        lat_grid, lon_grid = np.meshgrid(lats, lons, indexing='ij')
+        water = globe.is_ocean(lat_grid, lon_grid)
+
+        def coord_to_cell(lat, lon):
+            i = int(round((lat - lat_min) / res))
+            j = int(round((lon - lon_min) / res))
+            return max(0, min(i, nrows - 1)), max(0, min(j, ncols - 1))
+
+        def snap_to_water(i, j):
+            if water[i, j]:
+                return i, j
+            for r in range(1, 60):
+                for di in range(-r, r + 1):
+                    for dj in range(-r, r + 1):
+                        if abs(di) != r and abs(dj) != r:
+                            continue
+                        ni, nj = i + di, j + dj
+                        if 0 <= ni < nrows and 0 <= nj < ncols and water[ni, nj]:
+                            return ni, nj
+            return None, None
+
+        si, sj = snap_to_water(*coord_to_cell(start_lat, start_lon))
+        ei, ej = snap_to_water(*coord_to_cell(end_lat, end_lon))
+        if si is None or ei is None:
+            return None
+
+        # Pre-compute step costs at centre latitude (avoids haversine in inner loop)
+        clat = (start_lat + end_lat) / 2
+        step_ns   = _haversine_km(clat, 0, clat + res, 0)
+        step_ew   = _haversine_km(clat, 0, clat, res)
+        step_diag = (step_ns ** 2 + step_ew ** 2) ** 0.5
+        DIRS = {
+            (-1, 0): step_ns, (1, 0): step_ns,
+            (0, -1): step_ew, (0, 1): step_ew,
+            (-1,-1): step_diag, (-1, 1): step_diag,
+            ( 1,-1): step_diag, ( 1, 1): step_diag,
+        }
+
+        # A* search
+        INF = float('inf')
+        g = np.full((nrows, ncols), INF)
+        g[si, sj] = 0.0
+        prev = {}
+
+        def h(i, j):
+            return _haversine_km(float(lats[i]), float(lons[j]), end_lat, end_lon)
+
+        pq = [(h(si, sj), 0.0, si, sj)]
+
+        while pq:
+            f, gval, i, j = heapq.heappop(pq)
+            if gval > g[i, j]:
+                continue
+            if i == ei and j == ej:
+                break
+            for (di, dj), cost in DIRS.items():
+                ni, nj = i + di, j + dj
+                if not (0 <= ni < nrows and 0 <= nj < ncols) or not water[ni, nj]:
+                    continue
+                ng = gval + cost
+                if ng < g[ni, nj]:
+                    g[ni, nj] = ng
+                    prev[(ni, nj)] = (i, j)
+                    heapq.heappush(pq, (ng + h(ni, nj), ng, ni, nj))
+
+        if g[ei, ej] == INF:
+            return None
+
+        # Reconstruct path
+        path_cells = []
+        cur = (ei, ej)
+        while cur in prev:
+            path_cells.append(cur)
+            cur = prev[cur]
+        path_cells.append((si, sj))
+        path_cells.reverse()
+
+        # Downsample to ~300 points for the frontend
+        step = max(1, len(path_cells) // 300)
+        sampled = path_cells[::step]
+        if sampled[-1] != path_cells[-1]:
+            sampled.append(path_cells[-1])
+
+        coords = [[round(float(lons[j]), 6), round(float(lats[i]), 6)] for i, j in sampled]
+        km = float(g[ei, ej])
+
+        return {
+            'distance_km':    round(km, 3),
+            'distance_miles': round(km_to_miles(km), 3),
+            'coordinates':    coords,
+            'sea_routed':     False,
+            'ai_routed':      False,
+            'globe_routed':   True,
+            'warning':        None,
+            'from_db':        False,
+        }
+    except Exception as e:
+        print(f'Globe on-demand error: {e}')
+        return None
+
+
+@app.route('/api/save-route', methods=['POST'])
+def api_save_route():
+    d = request.get_json()
+    name = (d.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Route name is required'}), 400
+    result = {
+        'distance_km':    float(d['distance_km']),
+        'distance_miles': float(d['distance_miles']),
+        'coordinates':    d.get('coordinates'),
+        'warning':        None,
+    }
+    route_type = 'globe' if d.get('globe_routed') else ('sea' if d.get('sea_routed') else 'straight')
+    _db_save(
+        float(d['start_lat']), float(d['start_lon']),
+        float(d['end_lat']),   float(d['end_lon']),
+        result, route_type, name,
+    )
+    return jsonify({'ok': True, 'name': name})
+
+
 @app.route('/api/calculate', methods=['POST'])
 def api_calculate():
     d = request.get_json()
-    from calculate import calculate, km_to_miles
-    import math
+    from calculate import km_to_miles
 
     origin = [float(d['startLon']), float(d['startLat'])]
     dest   = [float(d['endLon']),   float(d['endLat'])]
 
-    # ── Pre-computed GLOBE shore-to-shore route (highest priority) ────────────
-    globe_result = _precomputed_shore_route(origin[1], origin[0], dest[1], dest[0])
-    if globe_result:
-        return jsonify(globe_result)
+    # 1. Pre-computed JSON files (git-committed, locked routes)
+    precomp = _precomputed_shore_route(origin[1], origin[0], dest[1], dest[0])
+    if precomp:
+        return jsonify(precomp)
 
-    # ── Database lookup (second priority) ─────────────────────────────────────
+    # 2. Database - manually saved and named routes
     db_result = _db_lookup(origin[1], origin[0], dest[1], dest[0])
     if db_result:
         return jsonify(db_result)
 
-    try:
-        result = calculate(origin, dest)
-        coords = result['geojson']['geometry']['coordinates']
+    # 3. On-demand GLOBE A* routing
+    globe = _globe_route_on_demand(origin[1], origin[0], dest[1], dest[0])
+    if globe:
+        return jsonify(globe)
 
-        # searoute returns distance=0 / single coord when the area isn't in its network
-        needs_ai = result['distance_km'] == 0 or len(coords) <= 1
-
-        if not needs_ai:
-            # Sanity check: searoute-py often snaps inland coordinates to the nearest
-            # ocean port and routes through the sea - giving a completely wrong result.
-            # If the returned route starts or ends more than 20 km from the input
-            # coordinates, or if the distance is >4× the straight-line haversine,
-            # the route is wrong and we fall back to AI.
-            haversine = _haversine_km(origin[1], origin[0], dest[1], dest[0])
-            first_lon, first_lat = float(coords[0][0]),  float(coords[0][1])
-            last_lon,  last_lat  = float(coords[-1][0]), float(coords[-1][1])
-            start_drift = _haversine_km(origin[1], origin[0], first_lat, first_lon)
-            end_drift   = _haversine_km(dest[1],   dest[0],   last_lat,  last_lon)
-            ratio       = result['distance_km'] / haversine if haversine > 0 else 99
-            if start_drift > 20 or end_drift > 20 or ratio > 1.5:
-                needs_ai = True
-
-        if needs_ai:
-            km = _haversine_km(origin[1], origin[0], dest[1], dest[0])
-            direct = [origin, dest]
-            # Check only the interior of the path - coastal endpoints touching land are
-            # expected (swimmer enters/exits from the beach) and are not a problem.
-            land_in_middle = _interior_crosses_land(origin, dest)
-            if not land_in_middle:
-                out = {
-                    'distance_km':    round(km, 3),
-                    'distance_miles': round(km_to_miles(km), 3),
-                    'coordinates':    direct,
-                    'sea_routed':     False,
-                    'ai_routed':      False,
-                    'warning':        None,
-                }
-                _db_save(origin[1], origin[0], dest[1], dest[0], out, 'straight')
-                return jsonify(out)
-            out = {
-                'distance_km':    round(km, 3),
-                'distance_miles': round(km_to_miles(km), 3),
-                'coordinates':    direct,
-                'sea_routed':     False,
-                'ai_routed':      False,
-                'warning':        'Route crosses land. Straight-line shown as reference - actual swimmable path will be longer.',
-            }
-            return jsonify(out)
-
-        out = {
-            'distance_km':    result['distance_km'],
-            'distance_miles': result['distance_miles'],
-            'coordinates':    coords,
-            'sea_routed':     True,
-            'warning':        None,
-        }
-        _db_save(origin[1], origin[0], dest[1], dest[0], out, 'sea')
-        return jsonify(out)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # 4. Haversine fallback (only if global-land-mask is not installed)
+    km = _haversine_km(origin[1], origin[0], dest[1], dest[0])
+    return jsonify({
+        'distance_km':    round(km, 3),
+        'distance_miles': round(km_to_miles(km), 3),
+        'coordinates':    [origin, dest],
+        'sea_routed':     False,
+        'ai_routed':      False,
+        'globe_routed':   False,
+        'warning':        'Routing engine unavailable - straight-line shown.',
+        'from_db':        False,
+    })
 
 
 def _ai_route_shore(origin, dest):

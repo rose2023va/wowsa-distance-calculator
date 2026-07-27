@@ -237,6 +237,21 @@ input[type=text]::placeholder { color: #30363d; }
 
     <div id="dl-btn-wrap"></div>
 
+    <!-- Save to database (shown only for fresh, unsaved results) -->
+    <div id="save-section" style="display:none; margin-top:4px;">
+      <div class="card" style="border-color:#238636;">
+        <div class="card-label" style="color:#3fb950;">Add to database</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <input type="text" id="route-name-input"
+                 placeholder="Route name (e.g. English Channel)"
+                 style="flex:1; min-width:180px;"
+                 autocomplete="off" spellcheck="false">
+          <button class="btn-primary" id="btn-save-route" onclick="saveRoute()">Add to database</button>
+        </div>
+        <div id="save-msg" style="font-size:12px; margin-top:8px; display:none;"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Map ───────────────────────────────────────────────────── -->
@@ -269,6 +284,8 @@ const S = {
   aiShoreMarkers:   [],
   startMarker:      null,
   endMarker:        null,
+  lastResult:       null,   // last API response, used by saveRoute()
+  lastCoords:       null,   // {start, end} objects from parseCoord
 };
 
 // ── Coord parsing ──────────────────────────────────────────────────────────────
@@ -398,7 +415,10 @@ async function runShore() {
   if (!end)   return showErr(errEl, 'Invalid end coordinate. Use: lat, lon or DMS format.');
 
   setBusy('shore', true);
-  let km, mi, coords, seaRouted = false, aiRouted = false, globeRouted = false, swimName = null, warning = null;
+  S.lastResult = null;
+  S.lastCoords = null;
+  let km, mi, coords, seaRouted = false, aiRouted = false, globeRouted = false,
+      swimName = null, warning = null, fromDb = false;
 
   if (S.serverOnline) {
     try {
@@ -407,15 +427,19 @@ async function runShore() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ startLat: start.lat, startLon: start.lon,
                                endLat:   end.lat,   endLon:   end.lon }),
-      });
+      }, 60000);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       km = data.distance_km; mi = data.distance_miles;
       coords = data.coordinates; seaRouted = data.sea_routed;
-      aiRouted = data.ai_routed || false;
+      aiRouted    = data.ai_routed    || false;
       globeRouted = data.globe_routed || false;
-      swimName = data.swim_name || null;
-      warning = data.warning || null;
+      swimName    = data.swim_name    || null;
+      warning     = data.warning      || null;
+      fromDb      = data.from_db      || false;
+      S.lastResult = { distance_km: km, distance_miles: mi, coordinates: coords,
+                       sea_routed: seaRouted, globe_routed: globeRouted, from_db: fromDb };
+      S.lastCoords = { start, end };
     } catch (e) {
       showErr(errEl, 'Server error: ' + e.message);
       setBusy('shore', false); return;
@@ -424,28 +448,43 @@ async function runShore() {
     km = haversineKm(start.lat, start.lon, end.lat, end.lon);
     mi = kmToMi(km);
     coords = null; seaRouted = false;
-    warning = 'Server offline - showing straight-line distance only. Start server.py for sea routing.';
+    warning = 'Server offline - showing straight-line distance only.';
   }
 
-  showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning });
+  showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning, fromDb });
   setBusy('shore', false);
 }
 
-function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning }) {
-  const label = globeRouted ? `Swimmable distance (GLOBE Dijkstra - verified${swimName ? ': ' + swimName : ''})`
-              : seaRouted   ? 'Swimmable distance (sea route)'
-              : aiRouted    ? 'Swimmable distance (AI water path)'
-              : warning     ? 'Reference distance (land crossing detected)'
-              :               'Swimmable distance';
+function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning, fromDb }) {
+  const savedName = swimName ? `: ${swimName}` : '';
+  const label = fromDb       ? `Swimmable distance (saved${savedName})`
+              : globeRouted  ? 'Swimmable distance (GLOBE - computing...)'
+              : seaRouted    ? 'Swimmable distance (sea route)'
+              : aiRouted     ? 'Swimmable distance (AI water path)'
+              : warning      ? 'Reference distance (land crossing detected)'
+              :                'Swimmable distance';
   document.getElementById('result-type-label').textContent = label;
   document.getElementById('result-km').textContent = f(km, 3) + ' km / ' + f(mi, 3) + ' mi';
   document.getElementById('result-mi').textContent = '';
-  const defaultNote = globeRouted ? 'GLOBE 925m Dijkstra routing - stress-tested zero land crossings. Suitable for WOWSA ratification.'
-                    : seaRouted   ? 'Sea-routed via searoute-py (avoids land). Suitable for WOWSA ratification.'
-                    : aiRouted    ? 'AI-generated water path (non-ocean). Drag amber markers to correct any land crossings.'
+  const defaultNote = fromDb      ? 'WOWSA verified route - retrieved from database.'
+                    : globeRouted ? 'GLOBE 925m A* routing - avoids land. Save to database to lock this as the official distance.'
+                    : seaRouted   ? 'Sea-routed via searoute-py (avoids land).'
+                    : aiRouted    ? 'AI-generated water path. Drag amber markers to correct any land crossings.'
                     :               '';
   document.getElementById('result-note').textContent = warning || defaultNote;
   document.getElementById('legs-card').style.display = 'none';
+
+  // Show save section only for fresh (not yet saved) results
+  const saveSection = document.getElementById('save-section');
+  if (S.serverOnline && !fromDb && !swimName) {
+    saveSection.style.display = 'block';
+    document.getElementById('save-msg').style.display = 'none';
+    document.getElementById('btn-save-route').disabled = false;
+    document.getElementById('route-name-input').disabled = false;
+    document.getElementById('route-name-input').value = '';
+  } else {
+    saveSection.style.display = 'none';
+  }
 
   document.getElementById('coords-display').textContent =
     `${f(start.lat,5)}, ${f(start.lon,5)}  →  ${f(end.lat,5)}, ${f(end.lon,5)}`;
@@ -983,13 +1022,71 @@ function previewWaypointsOnMap() {
   _updatePreviewDistance();
 }
 
+// ── Save to database ───────────────────────────────────────────────────────────
+async function saveRoute() {
+  const nameEl  = document.getElementById('route-name-input');
+  const msgEl   = document.getElementById('save-msg');
+  const btnEl   = document.getElementById('btn-save-route');
+  const name    = nameEl.value.trim();
+
+  msgEl.style.display = 'none';
+  if (!name) {
+    msgEl.textContent    = 'Enter a route name first.';
+    msgEl.style.color    = '#f85149';
+    msgEl.style.display  = 'block';
+    return;
+  }
+  if (!S.lastResult || !S.lastCoords) return;
+
+  btnEl.disabled = true;
+  try {
+    const res = await apiFetch('/api/save-route', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        distance_km:    S.lastResult.distance_km,
+        distance_miles: S.lastResult.distance_miles,
+        coordinates:    S.lastResult.coordinates,
+        globe_routed:   S.lastResult.globe_routed,
+        sea_routed:     S.lastResult.sea_routed,
+        start_lat:      S.lastCoords.start.lat,
+        start_lon:      S.lastCoords.start.lon,
+        end_lat:        S.lastCoords.end.lat,
+        end_lon:        S.lastCoords.end.lon,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Update label to reflect saved state
+    document.getElementById('result-type-label').textContent =
+      `Swimmable distance (saved: ${name})`;
+    document.getElementById('result-note').textContent =
+      'WOWSA verified route - saved to database.';
+
+    msgEl.textContent   = `Saved as "${name}"`;
+    msgEl.style.color   = '#3fb950';
+    msgEl.style.display = 'block';
+    nameEl.disabled     = true;
+  } catch (e) {
+    msgEl.textContent   = 'Save failed: ' + e.message;
+    msgEl.style.color   = '#f85149';
+    msgEl.style.display = 'block';
+    btnEl.disabled      = false;
+  }
+}
+
 // ── Utilities ──────────────────────────────────────────────────────────────────
 function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
 function clearResults() {
-  document.getElementById('results').style.display  = 'none';
-  document.getElementById('map-wrap').style.display = 'none';
+  document.getElementById('results').style.display      = 'none';
+  document.getElementById('map-wrap').style.display     = 'none';
+  document.getElementById('save-section').style.display = 'none';
   document.getElementById('shore-error').style.display  = 'none';
   document.getElementById('circum-error').style.display = 'none';
+  S.lastResult = null;
+  S.lastCoords = null;
 }
 function setBusy(which, busy) {
   const map = {
