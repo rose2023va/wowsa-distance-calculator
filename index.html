@@ -457,17 +457,17 @@ async function runShore() {
 
 function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning, fromDb }) {
   const savedName = swimName ? `: ${swimName}` : '';
-  const label = fromDb       ? `Swimmable distance (saved${savedName})`
-              : globeRouted  ? 'Swimmable distance (GLOBE - computing...)'
-              : seaRouted    ? 'Swimmable distance (sea route)'
-              : aiRouted     ? 'Swimmable distance (AI water path)'
-              : warning      ? 'Reference distance (land crossing detected)'
-              :                'Swimmable distance';
+  const label = fromDb      ? `Swimmable distance (saved${savedName})`
+              : globeRouted ? 'Swimmable distance (GLOBE A*)'
+              : seaRouted   ? 'Swimmable distance (sea route)'
+              : aiRouted    ? 'Swimmable distance (AI water path)'
+              : warning     ? 'Reference distance (land crossing detected)'
+              :               'Swimmable distance';
   document.getElementById('result-type-label').textContent = label;
   document.getElementById('result-km').textContent = f(km, 3) + ' km / ' + f(mi, 3) + ' mi';
   document.getElementById('result-mi').textContent = '';
-  const defaultNote = fromDb      ? 'WOWSA verified route - retrieved from database.'
-                    : globeRouted ? 'GLOBE 925m A* routing - avoids land. Save to database to lock this as the official distance.'
+  const defaultNote = fromDb      ? `WOWSA verified route - saved as "${swimName}".`
+                    : globeRouted ? 'GLOBE 925m A* routing - avoids land. Enter a name below to lock this as the official distance.'
                     : seaRouted   ? 'Sea-routed via searoute-py (avoids land).'
                     : aiRouted    ? 'AI-generated water path. Drag amber markers to correct any land crossings.'
                     :               '';
