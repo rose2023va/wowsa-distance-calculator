@@ -48,14 +48,6 @@ Each route segment is checked against a land polygon dataset before the result i
 
 **Map integration.** ZeroSixZero's existing map already displays the swimmer's GPS track. The second layer, WOWSA's calculated official route, needs to be added to that same map. Both paths on one view: what the swimmer actually swam, and what the standardized route is. The integration point is the existing map, not a new one.
 
-**Route pages.** Each established route needs a permanent page: official distance, the map, the list of people who've swum it (some ratified, some unverified). This is the product - the route as a living record.
-
----
-
-## What WOWSA contributes
-
-Route definitions - start and finish coordinates for crossings, locked waypoint files for circumnavigations. The distance calculator and all underlying code. Distance certificates generated from the official calculation for ratification purposes.
-
 ---
 
 ## The hard part
