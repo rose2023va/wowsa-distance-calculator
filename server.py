@@ -211,6 +211,37 @@ def _precomputed_shore_route(start_lat, start_lon, end_lat, end_lon):
     return None
 
 
+def _string_pull(cells, water, nrows, ncols):
+    """Greedy line-of-sight smoothing: replaces A* staircase with direct segments
+    wherever the straight line stays in water. Recalculates distance along the
+    smoothed path."""
+    if len(cells) <= 2:
+        return cells
+
+    def has_los(r1, c1, r2, c2):
+        steps = max(abs(r2 - r1), abs(c2 - c1))
+        if steps == 0:
+            return True
+        for k in range(1, steps):
+            r = int(round(r1 + k * (r2 - r1) / steps))
+            c = int(round(c1 + k * (c2 - c1) / steps))
+            if not (0 <= r < nrows and 0 <= c < ncols and water[r, c]):
+                return False
+        return True
+
+    result = [cells[0]]
+    i = 0
+    while i < len(cells) - 1:
+        j = len(cells) - 1
+        while j > i + 1:
+            if has_los(cells[i][0], cells[i][1], cells[j][0], cells[j][1]):
+                break
+            j -= 1
+        result.append(cells[j])
+        i = j
+    return result
+
+
 def _globe_route_on_demand(start_lat, start_lon, end_lat, end_lon):
     """A* pathfinding through a GLOBE land-mask water grid for any coordinate pair."""
     try:
@@ -324,14 +355,19 @@ def _globe_route_on_demand(start_lat, start_lon, end_lat, end_lon):
         path_cells.append((si, sj))
         path_cells.reverse()
 
-        # Downsample to ~300 points for the frontend
-        step = max(1, len(path_cells) // 300)
-        sampled = path_cells[::step]
-        if sampled[-1] != path_cells[-1]:
-            sampled.append(path_cells[-1])
+        # String-pull: remove staircase grid artifacts with line-of-sight smoothing
+        path_cells = _string_pull(path_cells, water, nrows, ncols)
 
-        coords = [[round(float(lons[j]), 6), round(float(lats[i]), 6)] for i, j in sampled]
-        km = float(g[ei, ej])
+        # Recalculate distance along the smoothed path
+        km = 0.0
+        for k in range(len(path_cells) - 1):
+            ri, ci = path_cells[k]
+            rj, cj = path_cells[k + 1]
+            km += _haversine_km(float(lats[ri]), float(lons[ci]),
+                                float(lats[rj]), float(lons[cj]))
+
+        coords = [[round(float(lons[j]), 6), round(float(lats[i]), 6)]
+                  for i, j in path_cells]
 
         return {
             'distance_km':    round(km, 3),
