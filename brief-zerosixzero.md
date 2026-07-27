@@ -8,7 +8,7 @@ It calculates the official swimmable distance for any open water route. The outp
 
 It covers two swim types: shore-to-shore crossings and circumnavigations (loops around an island or landmass).
 
-Currently runs locally on a laptop. The methodology is solid, but it isn't a hosted service yet.
+An initial build has been completed and is available to preview at [web-production-e08e3.up.railway.app](https://web-production-e08e3.up.railway.app). The core challenge encountered is routing accuracy - standard routing tools are built for shipping, not swimming, and struggle to stay in swimmable water, particularly in narrow channels, inland bodies, and anywhere close to shore.
 
 ---
 
@@ -26,7 +26,7 @@ Input is an ordered set of waypoints placed in open water around the landmass. T
 
 The waypoints are set by WOWSA, not derived from the swimmer. Once a circumnavigation is officially measured, those exact waypoints are locked. They become the permanent definition of that route, the same way start and finish coordinates define a crossing.
 
-Generating the initial waypoints: the tool fetches the island's boundary from OpenStreetMap, buffers 900 meters offshore, and samples evenly-spaced points around the perimeter. A human then reviews and confirms each one before anything gets calculated.
+Generating the initial waypoints: the tool fetches the island's boundary from OpenStreetMap, buffers 900 meters offshore, and samples evenly-spaced points around the perimeter. When that fails (the island isn't in OSM, or the generated points land on terrain), Claude AI proposes the waypoints instead, then runs a self-check against a land polygon dataset and corrects any points that are on land or produce segments that cross it. A human reviews and confirms each waypoint before anything gets calculated.
 
 ---
 
