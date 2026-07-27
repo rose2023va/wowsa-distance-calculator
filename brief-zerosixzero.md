@@ -32,7 +32,7 @@ Generating the initial waypoints: the tool fetches the island's boundary from Op
 
 ## Routing
 
-The primary routing library is searoute-py, which finds the shortest maritime path between two coordinates using a shipping lane network. It handles ocean crossings well.
+The primary routing library is [searoute-py](https://github.com/rose2023va/searoute-py), which finds the shortest maritime path between two coordinates using a shipping lane network. It handles ocean crossings well.
 
 It fails in two situations: narrow water bodies (gulfs, inland seas, lakes) where the shipping network has no coverage, and cases where it snaps to the nearest commercial port rather than the actual swim coordinates, sometimes hundreds of kilometers away. Both produce wrong results.
 
