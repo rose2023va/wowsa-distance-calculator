@@ -132,7 +132,7 @@ def api_calculate():
             start_drift = _haversine_km(origin[1], origin[0], first_lat, first_lon)
             end_drift   = _haversine_km(dest[1],   dest[0],   last_lat,  last_lon)
             ratio       = result['distance_km'] / haversine if haversine > 0 else 99
-            if start_drift > 20 or end_drift > 20 or ratio > 4:
+            if start_drift > 20 or end_drift > 20 or ratio > 1.5:
                 needs_ai = True
 
         if needs_ai:
