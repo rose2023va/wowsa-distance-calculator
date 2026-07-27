@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WOWSA · Swimmable Distance</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+/* ── Header ── */
+header { padding: 14px 28px; border-bottom: 1px solid #21262d;
+         display: flex; align-items: center; justify-content: space-between; }
+.header-title { font-size: 12px; font-weight: 500; color: #8b949e;
+                letter-spacing: 0.8px; text-transform: uppercase; }
+.server-pill { display: flex; align-items: center; gap: 6px;
+               font-size: 11px; color: #484f58; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #30363d; }
+.dot.online  { background: #3fb950; }
+.dot.partial { background: #d29922; }
+
+/* ── Layout ── */
+.container { max-width: 680px; margin: 36px auto; padding: 0 24px; }
+
+/* ── Mode tabs ── */
+.tabs { display: flex; border-bottom: 1px solid #21262d; margin-bottom: 28px; }
+.tab { padding: 9px 18px; font-size: 13px; color: #8b949e; cursor: pointer;
+       background: none; border: none; border-bottom: 2px solid transparent;
+       margin-bottom: -1px; transition: color 0.15s; }
+.tab:hover { color: #c9d1d9; }
+.tab.active { color: #e6edf3; border-bottom-color: #58a6ff; }
+
+/* ── Form fields ── */
+.field { margin-bottom: 18px; }
+label { display: block; font-size: 11px; color: #8b949e; text-transform: uppercase;
+        letter-spacing: 0.6px; margin-bottom: 6px; }
+label .hint { text-transform: none; letter-spacing: 0; font-size: 11px; color: #484f58; }
+input[type=text], input[type=number] {
+  width: 100%; padding: 9px 12px;
+  background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+  color: #e6edf3; font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace;
+  outline: none; }
+input[type=text]:focus, input[type=number]:focus {
+  border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,0.08); }
+input[type=text]::placeholder { color: #30363d; }
+
+/* ── Direction toggle ── */
+.dir-group { display: flex; gap: 0; }
+.dir-btn { padding: 8px 18px; font-size: 13px; background: #161b22;
+           border: 1px solid #30363d; color: #8b949e; cursor: pointer; }
+.dir-btn:first-child { border-radius: 6px 0 0 6px; }
+.dir-btn:last-child  { border-radius: 0 6px 6px 0; border-left: none; }
+.dir-btn.active { background: #1f6feb22; border-color: #388bfd; color: #58a6ff; }
+
+/* ── Buttons ── */
+.btn-primary { background: #238636; color: #fff; border: none;
+               padding: 9px 22px; border-radius: 6px; font-size: 13px;
+               cursor: pointer; font-weight: 500; }
+.btn-primary:hover:not(:disabled) { background: #2ea043; }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+.btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+                 padding: 7px 16px; border-radius: 6px; font-size: 13px;
+                 cursor: pointer; }
+.btn-secondary:hover:not(:disabled) { background: #30363d; }
+.btn-secondary:disabled { opacity: 0.4; cursor: default; }
+.btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+
+/* ── Error / status ── */
+.error-msg { color: #f85149; font-size: 12px; margin-top: 8px; display: none; }
+.info-msg  { color: #8b949e; font-size: 12px; margin-top: 8px; display: none; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #30363d;
+        border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Waypoint table ── */
+#wp-section { margin-top: 24px; display: none; }
+.wp-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.wp-header-label { font-size: 11px; color: #8b949e; text-transform: uppercase;
+                   letter-spacing: 0.6px; flex: 1; }
+#wp-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 14px; }
+#wp-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+               color: #484f58; padding: 5px 8px; text-align: left;
+               border-bottom: 1px solid #21262d; }
+#wp-table td { padding: 3px 6px; }
+.wp-num { color: #484f58; font-size: 11px; width: 24px; }
+.wp-input { background: #0d1117; border: 1px solid #21262d; border-radius: 4px;
+            color: #e6edf3; padding: 4px 8px; font-family: monospace; font-size: 12px;
+            width: 125px; outline: none; }
+.wp-input:focus { border-color: #388bfd; }
+.wp-del { background: none; border: none; color: #484f58; cursor: pointer;
+          font-size: 16px; padding: 2px 6px; line-height: 1; }
+.wp-del:hover { color: #f85149; }
+
+/* ── Results ── */
+#results { display: none; margin-top: 28px; }
+.card { background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+        padding: 18px 22px; margin-bottom: 12px; }
+.card-label { font-size: 10px; color: #8b949e; text-transform: uppercase;
+              letter-spacing: 0.7px; margin-bottom: 10px; }
+.dist-big  { font-size: 38px; font-weight: 700; color: #58a6ff; line-height: 1; }
+.dist-sub  { font-size: 13px; color: #8b949e; margin-top: 4px; }
+.dist-note { font-size: 11px; color: #484f58; margin-top: 8px; line-height: 1.6; }
+.legs-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.legs-table td { padding: 4px 0; color: #8b949e; }
+.legs-table td:last-child { text-align: right; color: #58a6ff; font-family: monospace; }
+.maps-btn { display: inline-flex; align-items: center; gap: 5px;
+            padding: 8px 16px; border-radius: 6px; background: #21262d;
+            border: 1px solid #30363d; color: #58a6ff; text-decoration: none; font-size: 13px; }
+.maps-btn:hover { background: #30363d; }
+.coords-line { font-size: 11px; color: #484f58; margin-top: 10px; font-family: monospace; }
+.cli-card { background: #161b22; border: 1px solid #21262d;
+            border-left: 3px solid #d29922; border-radius: 8px;
+            padding: 16px 20px; margin-bottom: 12px; }
+.cli-title { font-size: 10px; color: #d29922; text-transform: uppercase;
+             letter-spacing: 0.6px; margin-bottom: 8px; }
+.cli-desc  { font-size: 12px; color: #8b949e; margin-bottom: 10px; line-height: 1.6; }
+.cli-code  { background: #0d1117; border: 1px solid #21262d; border-radius: 5px;
+             padding: 9px 13px; font-family: 'SF Mono', 'Fira Code', monospace;
+             font-size: 12px; color: #e6edf3; overflow-x: auto; white-space: nowrap; }
+.dl-btn { display: inline-flex; margin-top: 10px; }
+
+/* ── Map ── */
+#map-wrap { display: none; margin-top: 28px; }
+#map { width: 100%; height: 480px; border: 1px solid #21262d; border-radius: 8px; }
+.map-caption { font-size: 11px; color: #484f58; text-align: center; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="header-title">WOWSA · Swimmable Distance</span>
+  <span class="server-pill">
+    <span class="dot" id="server-dot"></span>
+    <span id="server-label">Checking server…</span>
+  </span>
+</header>
+
+<div class="container">
+
+  <!-- Mode tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tab-shore" onclick="setMode('shore')">Shore to Shore</button>
+    <button class="tab"        id="tab-circum" onclick="setMode('circum')">Circumnavigation</button>
+  </div>
+
+  <!-- ── Shore to Shore ──────────────────────────────────────── -->
+  <div id="shore-panel">
+    <div class="field">
+      <label>Start coordinate</label>
+      <input type="text" id="shore-start"
+             placeholder="24°31′57.7″N, 110°21′13.8″W  or  24.5326, -110.3538"
+             autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>End coordinate</label>
+      <input type="text" id="shore-end"
+             placeholder="24°32′02.8″N, 110°21′02.5″W  or  24.5341, -110.3507"
+             autocomplete="off" spellcheck="false">
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-shore-calc" onclick="runShore()">Calculate</button>
+      <span id="shore-spin" style="display:none"><span class="spin"></span></span>
+    </div>
+    <div class="error-msg" id="shore-error"></div>
+  </div>
+
+  <!-- ── Circumnavigation ─────────────────────────────────────── -->
+  <div id="circum-panel" style="display:none">
+    <div class="field">
+      <label>Landmass name</label>
+      <input type="text" id="circum-name"
+             placeholder="Catalina Island, Manhattan Island, …"
+             autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>Direction</label>
+      <div class="dir-group">
+        <button type="button" class="dir-btn active" data-dir="clockwise"
+                onclick="setDir(this)">Clockwise</button>
+        <button type="button" class="dir-btn" data-dir="counterclockwise"
+                onclick="setDir(this)">Counterclockwise</button>
+      </div>
+    </div>
+    <div class="field" style="max-width:200px">
+      <label>Waypoints <span class="hint">(small island: 16–24 · large or complex: 30–50)</span></label>
+      <input type="number" id="circum-count" value="24" min="4" max="50">
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="btn-propose" onclick="proposeWaypoints()" disabled>
+        Generate waypoints with AI
+      </button>
+      <span id="propose-spin" style="display:none"><span class="spin"></span></span>
+    </div>
+    <div class="error-msg" id="circum-error"></div>
+    <div class="info-msg"  id="circum-info"></div>
+
+    <!-- Waypoint table (shown after AI generates or user adds manually) -->
+    <div id="wp-section">
+      <div class="wp-header">
+        <span class="wp-header-label">Waypoints — verify each is in open water on the map</span>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 12px"
+                onclick="addWaypointRow()">+ Add</button>
+      </div>
+      <table id="wp-table">
+        <thead>
+          <tr><th>#</th><th>Latitude</th><th>Longitude</th><th></th></tr>
+        </thead>
+        <tbody id="wp-tbody"></tbody>
+      </table>
+      <div class="btn-row">
+        <button class="btn-primary" id="btn-circum-run" onclick="runCircum()">Run circumnavigation</button>
+        <button class="btn-secondary" onclick="previewWaypointsOnMap()">Preview on map</button>
+        <span id="circum-spin" style="display:none"><span class="spin"></span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Results ───────────────────────────────────────────────── -->
+  <div id="results">
+    <div class="card">
+      <div class="card-label" id="result-type-label">Distance</div>
+      <div class="dist-big" id="result-km">—</div>
+      <div class="dist-sub" id="result-mi">—</div>
+      <div class="dist-note" id="result-note"></div>
+    </div>
+
+    <div class="card" id="legs-card" style="display:none">
+      <div class="card-label">Leg breakdown</div>
+      <table class="legs-table" id="legs-table"></table>
+    </div>
+
+    <div class="card" id="coords-card">
+      <div class="card-label">Coordinates</div>
+      <div class="coords-line" id="coords-display"></div>
+    </div>
+
+    <div id="dl-btn-wrap"></div>
+
+  </div>
+
+  <!-- ── Map ───────────────────────────────────────────────────── -->
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div class="map-caption" id="map-caption"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+// When served by Flask (local or Railway), use relative paths.
+// When opened as file://, fall back to localhost:5050.
+const S = {
+  serverUrl:       window.location.protocol === 'file:' ? 'http://localhost:5050' : '',
+  serverOnline:    false,
+  hasMapsKey:      false,
+  hasAnthropicKey: false,
+  mapsStatus:      'none',  // 'none' | 'loading' | 'ready'
+  pendingMapFn:    null,
+  mode:            'shore',
+  direction:       'clockwise',
+  waypoints:       [],      // [{lat, lon}]
+  wpMarkers:       [],
+  wpPolyline:      null,
+  routePolyline:   null,
+  mapInstance:     null,
+  aiShoreWaypoints: [],    // [{lat, lon}] for AI-routed shore-to-shore path
+  aiShoreMarkers:   [],
+};
+
+// ── Coord parsing ──────────────────────────────────────────────────────────────
+// Handles DMS: 24°31′57.7″N, 110°21′13.8″W
+//         and decimal: 24.5326, -110.3538
+function parseDMSPart(s) {
+  // Permissive: any non-digit as minute/second separator, handles all Unicode variants
+  const re = /(\d+)[^\d]+(\d+)[^\d.]+([\d.]+)[^\d\w]*([NSEWnsew])/;
+  const m = s.trim().match(re);
+  if (!m) return null;
+  let v = parseFloat(m[1]) + parseFloat(m[2]) / 60 + parseFloat(m[3]) / 3600;
+  if (/[SsWw]/.test(m[4])) v = -v;
+  return v;
+}
+
+function parseCoord(raw) {
+  raw = raw.trim();
+
+  // DMS mode: contains degree symbol
+  if (raw.includes('°')) {
+    // Split on comma that separates lat and lon (after the N/S/E/W marker)
+    const dmsRe = /([0-9]+[°][^,]+?[NSns])\s*,\s*([0-9]+[°].+?[EWew])\s*$/;
+    const m = raw.match(dmsRe);
+    if (m) {
+      const lat = parseDMSPart(m[1]);
+      const lon = parseDMSPart(m[2]);
+      if (lat !== null && lon !== null) return { lat, lon };
+    }
+    return null;
+  }
+
+  // Decimal degrees
+  const parts = raw.split(/[\s,]+/).filter(Boolean);
+  if (parts.length === 2) {
+    const lat = parseFloat(parts[0]);
+    const lon = parseFloat(parts[1]);
+    if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180)
+      return { lat, lon };
+  }
+  return null;
+}
+
+// ── Haversine fallback ─────────────────────────────────────────────────────────
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371, r = x => x * Math.PI / 180;
+  const dLat = r(lat2 - lat1), dLon = r(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function kmToMi(km) { return (km * 0.621371).toFixed(1); }
+function f(n, d)    { return Number(n).toFixed(d); }
+
+// ── Fetch helpers ──────────────────────────────────────────────────────────────
+function timeout(ms) {
+  return new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms));
+}
+async function apiFetch(path, opts = {}, ms = 20000) {
+  return Promise.race([
+    fetch(S.serverUrl + path, opts),
+    timeout(ms),
+  ]);
+}
+
+// ── Server detection ───────────────────────────────────────────────────────────
+async function checkServer() {
+  const dot   = document.getElementById('server-dot');
+  const label = document.getElementById('server-label');
+  try {
+    const res  = await Promise.race([fetch(S.serverUrl + '/api/config'), timeout(1000)]);
+    const data = await res.json();
+    S.serverOnline    = true;
+    S.hasMapsKey      = data.hasMapsKey;
+    S.hasAnthropicKey = data.hasAnthropicKey;
+
+    if (S.hasMapsKey && S.hasAnthropicKey) {
+      dot.className = 'dot online';
+      label.textContent = 'Server online';
+    } else {
+      dot.className = 'dot partial';
+      label.textContent = 'Server online' + (!S.hasMapsKey ? ' — Maps key missing' : '') +
+                          (!S.hasAnthropicKey ? ' — Anthropic key missing' : '');
+    }
+
+    if (S.hasMapsKey) {
+      const kr  = await apiFetch('/api/maps-key');
+      const kd  = await kr.json();
+      loadMapsApi(kd.key);
+    }
+  } catch {
+    S.serverOnline = false;
+    dot.className  = 'dot';
+    label.textContent = 'Server offline — straight-line only';
+  }
+  updateButtonStates();
+}
+
+// ── Mode / direction ───────────────────────────────────────────────────────────
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('shore-panel').style.display  = m === 'shore'  ? '' : 'none';
+  document.getElementById('circum-panel').style.display = m === 'circum' ? '' : 'none';
+  document.getElementById('tab-shore').classList.toggle('active', m === 'shore');
+  document.getElementById('tab-circum').classList.toggle('active', m === 'circum');
+  clearResults();
+}
+
+function setDir(btn) {
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  S.direction = btn.dataset.dir;
+}
+
+function updateButtonStates() {
+  // Allow if server is online — pre-computed routes work without Anthropic key;
+  // AI fallback will error gracefully if the key is missing.
+  document.getElementById('btn-propose').disabled = !S.serverOnline;
+}
+
+// ── Shore-to-Shore ─────────────────────────────────────────────────────────────
+async function runShore() {
+  const errEl  = document.getElementById('shore-error');
+  errEl.style.display = 'none';
+  const start = parseCoord(document.getElementById('shore-start').value);
+  const end   = parseCoord(document.getElementById('shore-end').value);
+  if (!start) return showErr(errEl, 'Invalid start coordinate. Use: lat, lon or DMS format.');
+  if (!end)   return showErr(errEl, 'Invalid end coordinate. Use: lat, lon or DMS format.');
+
+  setBusy('shore', true);
+  let km, mi, coords, seaRouted = false, aiRouted = false, globeRouted = false, swimName = null, warning = null;
+
+  if (S.serverOnline) {
+    try {
+      const res = await apiFetch('/api/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startLat: start.lat, startLon: start.lon,
+                               endLat:   end.lat,   endLon:   end.lon }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      km = data.distance_km; mi = data.distance_miles;
+      coords = data.coordinates; seaRouted = data.sea_routed;
+      aiRouted = data.ai_routed || false;
+      globeRouted = data.globe_routed || false;
+      swimName = data.swim_name || null;
+      warning = data.warning || null;
+    } catch (e) {
+      showErr(errEl, 'Server error: ' + e.message);
+      setBusy('shore', false); return;
+    }
+  } else {
+    km = haversineKm(start.lat, start.lon, end.lat, end.lon);
+    mi = kmToMi(km);
+    coords = null; seaRouted = false;
+    warning = 'Server offline — showing straight-line distance only. Start server.py for sea routing.';
+  }
+
+  showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning });
+  setBusy('shore', false);
+}
+
+function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning }) {
+  const label = globeRouted ? `Swimmable distance (GLOBE Dijkstra — verified${swimName ? ': ' + swimName : ''})`
+              : seaRouted   ? 'Swimmable distance (sea route)'
+              : aiRouted    ? 'Swimmable distance (AI water path)'
+              :                'Point-to-point distance (straight line)';
+  document.getElementById('result-type-label').textContent = label;
+  document.getElementById('result-km').textContent = f(km, 3) + ' km / ' + f(mi, 3) + ' mi';
+  document.getElementById('result-mi').textContent = '';
+  const defaultNote = globeRouted ? 'GLOBE 925m Dijkstra routing — stress-tested zero land crossings. Suitable for WOWSA ratification.'
+                    : seaRouted   ? 'Sea-routed via searoute-py (avoids land). Suitable for WOWSA ratification.'
+                    : aiRouted    ? 'AI-generated water path (non-ocean). Drag amber markers to correct any land crossings.'
+                    :               '';
+  document.getElementById('result-note').textContent = warning || defaultNote;
+  document.getElementById('legs-card').style.display = 'none';
+
+  document.getElementById('coords-display').textContent =
+    `${f(start.lat,5)}, ${f(start.lon,5)}  →  ${f(end.lat,5)}, ${f(end.lon,5)}`;
+
+  document.getElementById('dl-btn-wrap').innerHTML = '';
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  let drawFn;
+  if (coords && globeRouted) {
+    drawFn = () => drawGlobeShoreRoute(coords, start, end);
+  } else if (coords && seaRouted) {
+    drawFn = () => drawSeaRoute(coords, start, end);
+  } else if (coords && aiRouted) {
+    drawFn = () => drawAiShoreRoute(coords, start, end);
+  } else {
+    const reason = warning && warning.includes('offline')
+      ? 'Server offline — straight-line shown for reference only'
+      : 'Straight-line reference — no water path available';
+    drawFn = () => drawGeodesic(start, end, reason);
+  }
+  if (S.mapsStatus === 'ready') drawFn();
+  else if (S.mapsStatus === 'loading') S.pendingMapFn = drawFn;
+}
+
+// ── Circumnavigation ───────────────────────────────────────────────────────────
+async function proposeWaypoints() {
+  const errEl  = document.getElementById('circum-error');
+  const infoEl = document.getElementById('circum-info');
+  errEl.style.display = infoEl.style.display = 'none';
+  const name = document.getElementById('circum-name').value.trim();
+  if (!name) return showErr(errEl, 'Enter a landmass name first.');
+
+  // Reset state from any previous search
+  document.getElementById('btn-circum-run').style.display = '';
+
+  setBusy('propose', true);
+  try {
+    const res = await apiFetch('/api/propose-waypoints', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        landmass:  name,
+        direction: S.direction,
+        count:     parseInt(document.getElementById('circum-count').value) || 30,
+      }),
+    }, 90000);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    S.waypoints = data.waypoints.map((w, i) => ({
+      lat:  w[1],
+      lon:  w[0],
+      name: data.waypoint_names ? data.waypoint_names[i] : '',
+    }));
+    renderWaypointTable(!!data.precomputed);
+    document.getElementById('wp-section').style.display = 'block';
+
+    if (data.precomputed) {
+      // Pre-computed GLOBE route: show result immediately — no need to click Calculate
+      infoEl.innerHTML =
+        `<b style="color:#3fb950">✓ Pre-computed GLOBE route</b> — ${data.source}.<br>` +
+        `${S.waypoints.length} named waypoints. Displaying full computed path below.`;
+      infoEl.style.display = 'block';
+      document.getElementById('btn-circum-run').style.display = 'none';
+      showCircumResults({
+        total_distance_km:    data.distance_km,
+        total_distance_miles: data.distance_miles,
+        waypoints_used:       S.waypoints,
+        legs:                 null,
+        segments:             data.segments,
+        route_coordinates:    data.path,
+        precomputed:          true,
+        source:               data.source,
+      });
+    } else {
+      const crossings = data.land_crossings || 0;
+      const fromOsm   = data.source === 'osmnx';
+      if (fromOsm && crossings === 0) {
+        infoEl.innerHTML =
+          `<b style="color:#3fb950">✓ Route computed from OpenStreetMap boundary</b> — ` +
+          `${S.waypoints.length} waypoints, zero land crossings. ` +
+          `Verify on map, then run circumnavigation.`;
+      } else if (fromOsm && crossings > 0) {
+        infoEl.innerHTML =
+          `<b style="color:#3fb950">OpenStreetMap boundary route</b> — ${S.waypoints.length} waypoints. ` +
+          `<b style="color:#d29922">⚠ ${crossings} segment(s) near satellite islands</b> — ` +
+          `drag markers to correct if needed.`;
+      } else if (crossings === 0) {
+        infoEl.innerHTML =
+          `<b style="color:#3fb950">✓ ${S.waypoints.length} AI waypoints — no land crossings detected.</b> ` +
+          `Verify on map, then run circumnavigation.`;
+      } else {
+        infoEl.innerHTML =
+          `${S.waypoints.length} AI waypoints generated. ` +
+          `<b style="color:#d29922">⚠ ${crossings} segment(s) may still cross land</b> — ` +
+          `drag markers to correct, then run circumnavigation.`;
+      }
+      infoEl.style.display = 'block';
+      document.getElementById('btn-circum-run').style.display = '';
+      previewWaypointsOnMap();
+    }
+  } catch (e) {
+    showErr(errEl, 'Error: ' + e.message);
+  }
+  setBusy('propose', false);
+}
+
+async function runCircum() {
+  const errEl = document.getElementById('circum-error');
+  errEl.style.display = 'none';
+  if (S.waypoints.length < 2) return showErr(errEl, 'Need at least 2 waypoints.');
+
+  setBusy('circum', true);
+  try {
+    const res = await apiFetch('/api/circumnavigate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waypoints: S.waypoints }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showCircumResults(data);
+  } catch (e) {
+    showErr(errEl, 'Error: ' + e.message);
+  }
+  setBusy('circum', false);
+}
+
+function showCircumResults(data) {
+  const name = document.getElementById('circum-name').value.trim();
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+
+  if (data.precomputed) {
+    document.getElementById('result-type-label').textContent =
+      'Circumnavigation distance (GLOBE Dijkstra — verified)';
+    document.getElementById('result-note').textContent =
+      `${data.source} — stress-tested: zero land crossings.`;
+  } else {
+    const hasHaversine = data.legs && data.legs.some(l => l.method === 'haversine');
+    const method = hasHaversine ? 'sea route + straight-line fallback' : 'sea route';
+    document.getElementById('result-type-label').textContent =
+      `Circumnavigation distance (${method})`;
+    document.getElementById('result-note').textContent =
+      `${data.waypoints_used.length} waypoints — sea-routed via searoute-py.`;
+  }
+  document.getElementById('result-km').textContent =
+    f(data.total_distance_km, 3) + ' km / ' + f(data.total_distance_miles, 3) + ' mi';
+  document.getElementById('result-mi').textContent = '';
+
+  if (data.warning) {
+    const noteEl = document.getElementById('result-note');
+    noteEl.textContent = noteEl.textContent + ' ' + data.warning;
+  }
+
+  // Leg / segment breakdown
+  const legsCard = document.getElementById('legs-card');
+  const tbody    = document.getElementById('legs-table');
+  if (data.precomputed && data.segments && data.segments.length) {
+    tbody.innerHTML = data.segments.map(s =>
+      `<tr><td>${s.from} → ${s.to}</td>` +
+      `<td style="text-align:right">${f(s.km,3)} km / ${f(s.miles,3)} mi</td></tr>`
+    ).join('');
+    legsCard.style.display = 'block';
+  } else if (data.legs && data.legs.length) {
+    tbody.innerHTML = data.legs.map(l => {
+      const badge = l.method === 'haversine'
+        ? ' <span style="font-size:10px;color:#f59e0b;opacity:0.8">(straight-line)</span>'
+        : '';
+      return `<tr><td>Leg ${l.leg}${badge}</td>` +
+             `<td style="text-align:right">${l.distance_km} km / ${l.distance_miles} mi</td></tr>`;
+    }).join('');
+    legsCard.style.display = 'block';
+  } else {
+    legsCard.style.display = 'none';
+  }
+
+  document.getElementById('coords-display').textContent =
+    `${data.waypoints_used.length} waypoints around ${name}`;
+  document.getElementById('dl-btn-wrap').innerHTML =
+    `<button class="btn-secondary dl-btn" style="margin-top:10px;font-size:12px"
+             onclick="downloadWaypoints('${slug}')">Download locked-${slug}-waypoints.json</button>`;
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  if (data.route_coordinates) {
+    const coords = data.route_coordinates;
+    const wps    = data.waypoints_used;
+    const named  = data.precomputed;
+    const drawFn = named
+      ? () => drawGlobeRoute(coords, wps)
+      : () => drawCircumRoute(coords, wps);
+    if (S.mapsStatus === 'ready') drawFn();
+    else if (S.mapsStatus === 'loading') S.pendingMapFn = drawFn;
+  }
+}
+
+// ── Waypoint table ──────────────────────────────────────────────────────────────
+function renderWaypointTable(isPrecomputed = false) {
+  // Update table header
+  const thead = document.querySelector('#wp-table thead tr');
+  if (isPrecomputed) {
+    thead.innerHTML = '<th>#</th><th>Name</th><th>Latitude</th><th>Longitude</th>';
+  } else {
+    thead.innerHTML = '<th>#</th><th>Latitude</th><th>Longitude</th><th></th>';
+  }
+
+  const tbody = document.getElementById('wp-tbody');
+  tbody.innerHTML = '';
+  S.waypoints.forEach((wp, i) => {
+    const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    if (isPrecomputed) {
+      tr.innerHTML = `
+        <td class="wp-num">${i + 1}</td>
+        <td style="color:#8b949e;font-size:11px;padding:3px 6px">${wp.name || ''}</td>
+        <td><input class="wp-input" type="text" value="${f(wp.lat,6)}" data-field="lat"></td>
+        <td><input class="wp-input" type="text" value="${f(wp.lon,6)}" data-field="lon"></td>`;
+    } else {
+      tr.innerHTML = `
+        <td class="wp-num">${i + 1}</td>
+        <td><input class="wp-input" type="text" value="${f(wp.lat,6)}" data-field="lat"></td>
+        <td><input class="wp-input" type="text" value="${f(wp.lon,6)}" data-field="lon"></td>
+        <td><button class="wp-del" title="Remove">×</button></td>`;
+      tr.querySelector('.wp-del').addEventListener('click', () => {
+        S.waypoints.splice(i, 1);
+        renderWaypointTable();
+        previewWaypointsOnMap();
+      });
+    }
+    const inputs = tr.querySelectorAll('.wp-input');
+    inputs.forEach(inp => inp.addEventListener('change', () => {
+      S.waypoints[i][inp.dataset.field] = parseFloat(inp.value) || 0;
+    }));
+    tbody.appendChild(tr);
+  });
+}
+
+function addWaypointRow() {
+  S.waypoints.push({ lat: 0, lon: 0 });
+  renderWaypointTable();
+  document.getElementById('wp-section').style.display = 'block';
+}
+
+function downloadWaypoints(slug) {
+  const data = JSON.stringify(S.waypoints.map(w => [w.lon, w.lat]), null, 2);
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  a.download = `locked-${slug}-waypoints.json`;
+  a.click();
+}
+
+// ── Google Maps ────────────────────────────────────────────────────────────────
+window._mapsReady = function () {
+  S.mapsStatus = 'ready';
+  if (S.pendingMapFn) { S.pendingMapFn(); S.pendingMapFn = null; }
+};
+
+function loadMapsApi(key) {
+  if (S.mapsStatus !== 'none') return;
+  S.mapsStatus = 'loading';
+  const s = document.createElement('script');
+  s.src      = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=_mapsReady&loading=async`;
+  s.async    = true;
+  s.defer    = true;
+  s.onerror = () => { S.mapsStatus = 'none'; };
+  document.head.appendChild(s);
+}
+
+function getMap(center, zoom) {
+  const wrap = document.getElementById('map-wrap');
+  wrap.style.display = 'block';
+  if (!S.mapInstance) {
+    S.mapInstance = new google.maps.Map(document.getElementById('map'), {
+      mapTypeId: 'satellite', zoom, center,
+    });
+  }
+  // Clear old overlays
+  if (S.routePolyline) { S.routePolyline.setMap(null); S.routePolyline = null; }
+  if (S.wpPolyline)    { S.wpPolyline.setMap(null);    S.wpPolyline    = null; }
+  S.wpMarkers.forEach(m => m.setMap(null));
+  S.wpMarkers = [];
+  S.aiShoreMarkers.forEach(m => m.setMap(null));
+  S.aiShoreMarkers = [];
+  return S.mapInstance;
+}
+
+function markerIcon(color) {
+  return { path: google.maps.SymbolPath.CIRCLE, scale: 7,
+           fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 };
+}
+
+function drawSeaRoute(coords, start, end) {
+  const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
+  const map  = getMap(path[0], 5);
+  S.routePolyline = new google.maps.Polyline({
+    path, map, geodesic: false,
+    strokeColor: '#58a6ff', strokeOpacity: 0.9, strokeWeight: 3,
+  });
+  new google.maps.Marker({ position: path[0],              map, icon: markerIcon('#3fb950'), title: 'Start' });
+  new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End' });
+  const b = new google.maps.LatLngBounds();
+  path.forEach(p => b.extend(p));
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent = 'Sea route via searoute-py (avoids land)';
+}
+
+function drawGlobeShoreRoute(coords, start, end) {
+  // Green verified path — GLOBE Dijkstra, zero land crossings
+  const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
+  const map  = getMap(path[0], 8);
+  S.routePolyline = new google.maps.Polyline({
+    path, map, geodesic: false,
+    strokeColor: '#3fb950', strokeOpacity: 0.9, strokeWeight: 3,
+  });
+  new google.maps.Marker({ position: path[0],              map, icon: markerIcon('#3fb950'), title: 'Start' });
+  new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End' });
+  const b = new google.maps.LatLngBounds();
+  path.forEach(p => b.extend(p));
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent =
+    'GLOBE Dijkstra route — verified zero land crossings';
+}
+
+function drawGeodesic(start, end, reason) {
+  const s = { lat: start.lat, lng: start.lon };
+  const e = { lat: end.lat,   lng: end.lon   };
+  const map = getMap(s, 5);
+  // Grey dashed line — clearly NOT a swimmable route
+  S.routePolyline = new google.maps.Polyline({
+    path: [s, e], map, geodesic: true,
+    strokeColor: '#6e7681', strokeOpacity: 0.5, strokeWeight: 2,
+    icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+              offset: '0', repeat: '10px' }],
+  });
+  new google.maps.Marker({ position: s, map, icon: markerIcon('#3fb950'), title: 'Start' });
+  new google.maps.Marker({ position: e, map, icon: markerIcon('#f85149'), title: 'End' });
+  const b = new google.maps.LatLngBounds();
+  b.extend(s); b.extend(e);
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent =
+    reason || 'Straight-line reference only — not a swimmable route';
+}
+
+function drawAiShoreRoute(coords, start, end) {
+  // Amber polyline for AI-generated non-ocean paths
+  const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
+  const map  = getMap(path[0], 8);
+  S.routePolyline = new google.maps.Polyline({
+    path, map, geodesic: false,
+    strokeColor: '#d29922', strokeOpacity: 0.9, strokeWeight: 3,
+  });
+  // Fixed start/end markers
+  new google.maps.Marker({ position: path[0],              map, icon: markerIcon('#3fb950'), title: 'Start' });
+  new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   });
+
+  // Draggable intermediate markers — user can correct AI mistakes
+  S.aiShoreWaypoints = coords.map(c => ({ lat: c[1], lon: c[0] }));
+  S.aiShoreMarkers = [];
+  const infoW = new google.maps.InfoWindow();
+  coords.slice(1, -1).forEach((c, idx) => {
+    const i = idx + 1; // actual index in aiShoreWaypoints
+    const m = new google.maps.Marker({
+      position: { lat: c[1], lng: c[0] }, map, draggable: true,
+      label: { text: String(i), color: '#fff', fontSize: '9px', fontWeight: '700' },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7,
+              fillColor: '#d29922', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+    });
+    m.addListener('click', () => {
+      const p = m.getPosition();
+      infoW.setContent(`<b>Via-point ${i}</b><br>${f(p.lat(),5)}, ${f(p.lng(),5)}`);
+      infoW.open(map, m);
+    });
+    m.addListener('drag', () => {
+      const p = m.getPosition();
+      S.aiShoreWaypoints[i] = { lat: p.lat(), lon: p.lng() };
+      S.routePolyline.setPath(S.aiShoreWaypoints.map(w => ({ lat: w.lat, lng: w.lon })));
+    });
+    m.addListener('dragend', () => {
+      const p = m.getPosition();
+      S.aiShoreWaypoints[i] = { lat: p.lat(), lon: p.lng() };
+      // Recalculate total distance
+      let total = 0;
+      for (let j = 0; j < S.aiShoreWaypoints.length - 1; j++) {
+        total += haversineKm(S.aiShoreWaypoints[j].lat, S.aiShoreWaypoints[j].lon,
+                             S.aiShoreWaypoints[j+1].lat, S.aiShoreWaypoints[j+1].lon);
+      }
+      const mi = kmToMi(total);
+      document.getElementById('result-km').textContent = f(total, 3) + ' km / ' + f(mi, 3) + ' mi';
+    });
+    S.aiShoreMarkers.push(m);
+  });
+
+  const b = new google.maps.LatLngBounds();
+  path.forEach(p => b.extend(p));
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent =
+    'AI-generated water path — drag amber markers to correct any land crossings';
+}
+
+function drawCircumRoute(coords, wps) {
+  const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
+  const map  = getMap(path[0], 5);
+  S.routePolyline = new google.maps.Polyline({
+    path, map, geodesic: false,
+    strokeColor: '#58a6ff', strokeOpacity: 0.9, strokeWeight: 3,
+  });
+  addWaypointMarkers(map, wps.map(w => ({ lat: w.lat, lon: w.lon })));
+  const b = new google.maps.LatLngBounds();
+  path.forEach(p => b.extend(p));
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent = 'Sea route via searoute-py — click markers for coordinates';
+}
+
+function drawGlobeRoute(coords, wps) {
+  // Dense path from GLOBE Dijkstra computation — coords are [lon, lat]
+  const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
+  const map  = getMap(path[0], 6);
+  S.routePolyline = new google.maps.Polyline({
+    path, map, geodesic: false,
+    strokeColor: '#3fb950', strokeOpacity: 0.85, strokeWeight: 3,
+  });
+  // Named waypoint markers — show name in info window
+  const info = new google.maps.InfoWindow();
+  wps.forEach((wp, i) => {
+    const pos = { lat: wp.lat, lng: wp.lon };
+    const m   = new google.maps.Marker({
+      position: pos, map,
+      label: { text: String(i + 1), color: '#fff', fontSize: '9px', fontWeight: '700' },
+      icon:  { path: google.maps.SymbolPath.CIRCLE, scale: 8,
+               fillColor: '#d29922', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+    });
+    m.addListener('click', () => {
+      const label = wp.name ? `<b>${wp.name}</b><br>` : `<b>Waypoint ${i+1}</b><br>`;
+      info.setContent(label + `${f(wp.lat,5)}, ${f(wp.lon,5)}`);
+      info.open(map, m);
+    });
+    S.wpMarkers.push(m);
+  });
+  const b = new google.maps.LatLngBounds();
+  path.forEach(p => b.extend(p));
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent =
+    'GLOBE Dijkstra route — verified zero land crossings — click markers for waypoint names';
+}
+
+function addWaypointMarkers(map, wps, draggable = false) {
+  const info = new google.maps.InfoWindow();
+  wps.forEach((wp, i) => {
+    const pos = { lat: wp.lat, lng: wp.lon };
+    const m   = new google.maps.Marker({
+      position: pos, map, draggable,
+      label: { text: String(i + 1), color: '#fff', fontSize: '10px', fontWeight: '700' },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9,
+              fillColor: '#d29922', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+    });
+
+    // Click shows coordinates (always current position)
+    m.addListener('click', () => {
+      const p = m.getPosition();
+      info.setContent(`<b>Waypoint ${i + 1}</b><br>${f(p.lat(),5)}, ${f(p.lng(),5)}`);
+      info.open(map, m);
+    });
+
+    if (draggable) {
+      m.addListener('drag', () => {
+        const p = m.getPosition();
+        S.waypoints[i].lat = p.lat();
+        S.waypoints[i].lon = p.lng();
+        if (S.wpPolyline) {
+          S.wpPolyline.setPath([...S.waypoints, S.waypoints[0]].map(w => ({ lat: w.lat, lng: w.lon })));
+        }
+        _syncTableRow(i, p.lat(), p.lng());
+        _updatePreviewDistance();
+      });
+
+      m.addListener('dragend', () => {
+        const p = m.getPosition();
+        S.waypoints[i].lat = p.lat();
+        S.waypoints[i].lon = p.lng();
+        _syncTableRow(i, p.lat(), p.lng());
+        _updatePreviewDistance();
+      });
+    }
+
+    S.wpMarkers.push(m);
+  });
+}
+
+function _syncTableRow(idx, lat, lng) {
+  const row = document.querySelector(`#wp-tbody tr[data-i="${idx}"]`);
+  if (!row) return;
+  const inputs = row.querySelectorAll('.wp-input');
+  if (inputs[0]) inputs[0].value = lat.toFixed(6);
+  if (inputs[1]) inputs[1].value = lng.toFixed(6);
+}
+
+function _updatePreviewDistance() {
+  if (S.waypoints.length < 2) return;
+  const loop = [...S.waypoints, S.waypoints[0]];
+  let total = 0;
+  for (let j = 0; j < loop.length - 1; j++)
+    total += haversineKm(loop[j].lat, loop[j].lon, loop[j+1].lat, loop[j+1].lon);
+  const infoEl = document.getElementById('circum-info');
+  if (infoEl && infoEl.style.display !== 'none') {
+    // Update only the distance part — preserve any land-crossing warning
+    const note = `Estimated perimeter: <b>${f(total, 1)} km / ${f(total * 0.621371, 1)} mi</b> (straight-line segments)`;
+    // Only replace if no pre-computed text is there
+    if (!infoEl.innerHTML.includes('GLOBE')) infoEl.innerHTML = note;
+  }
+}
+
+function previewWaypointsOnMap() {
+  if (S.waypoints.length < 2) return;
+  if (S.mapsStatus !== 'ready') {
+    if (S.mapsStatus === 'loading') S.pendingMapFn = previewWaypointsOnMap;
+    return;
+  }
+  const map  = getMap({ lat: S.waypoints[0].lat, lng: S.waypoints[0].lon }, 6);
+  const loop = [...S.waypoints, S.waypoints[0]].map(w => ({ lat: w.lat, lng: w.lon }));
+  S.wpPolyline = new google.maps.Polyline({
+    path: loop, map, geodesic: false,
+    strokeColor: '#d29922', strokeOpacity: 0.6, strokeWeight: 2,
+  });
+  addWaypointMarkers(map, S.waypoints, true);
+  const b = new google.maps.LatLngBounds();
+  S.waypoints.forEach(w => b.extend({ lat: w.lat, lng: w.lon }));
+  map.fitBounds(b);
+  document.getElementById('map-caption').textContent =
+    'Drag markers to adjust — distance updates live as you drag';
+  _updatePreviewDistance();
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+function clearResults() {
+  document.getElementById('results').style.display  = 'none';
+  document.getElementById('map-wrap').style.display = 'none';
+  document.getElementById('shore-error').style.display  = 'none';
+  document.getElementById('circum-error').style.display = 'none';
+}
+function setBusy(which, busy) {
+  const map = {
+    shore:   ['btn-shore-calc', 'shore-spin'],
+    propose: ['btn-propose',    'propose-spin'],
+    circum:  ['btn-circum-run', 'circum-spin'],
+  };
+  const [btnId, spinId] = map[which];
+  const btn  = document.getElementById(btnId);
+  const spin = document.getElementById(spinId);
+  if (btn)  btn.disabled           = busy;
+  if (spin) spin.style.display     = busy ? '' : 'none';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+checkServer();
+</script>
+</body>
+</html>

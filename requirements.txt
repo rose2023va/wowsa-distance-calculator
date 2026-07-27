@@ -1,0 +1,10 @@
+searoute
+gpxpy
+flask
+flask-cors
+anthropic
+shapely
+pyshp
+numpy
+osmnx
+pyproj
