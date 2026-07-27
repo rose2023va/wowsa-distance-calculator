@@ -198,7 +198,7 @@ input[type=text]::placeholder { color: #30363d; }
     <!-- Waypoint table (shown after AI generates or user adds manually) -->
     <div id="wp-section">
       <div class="wp-header">
-        <span class="wp-header-label">Waypoints — verify each is in open water on the map</span>
+        <span class="wp-header-label">Waypoints - verify each is in open water on the map</span>
         <button class="btn-secondary" style="font-size:12px;padding:5px 12px"
                 onclick="addWaypointRow()">+ Add</button>
       </div>
@@ -220,8 +220,8 @@ input[type=text]::placeholder { color: #30363d; }
   <div id="results">
     <div class="card">
       <div class="card-label" id="result-type-label">Distance</div>
-      <div class="dist-big" id="result-km">—</div>
-      <div class="dist-sub" id="result-mi">—</div>
+      <div class="dist-big" id="result-km">-</div>
+      <div class="dist-sub" id="result-mi">-</div>
       <div class="dist-note" id="result-note"></div>
     </div>
 
@@ -348,8 +348,8 @@ async function checkServer() {
       label.textContent = 'Server online';
     } else {
       dot.className = 'dot partial';
-      label.textContent = 'Server online' + (!S.hasMapsKey ? ' — Maps key missing' : '') +
-                          (!S.hasAnthropicKey ? ' — Anthropic key missing' : '');
+      label.textContent = 'Server online' + (!S.hasMapsKey ? ' - Maps key missing' : '') +
+                          (!S.hasAnthropicKey ? ' - Anthropic key missing' : '');
     }
 
     if (S.hasMapsKey) {
@@ -360,7 +360,7 @@ async function checkServer() {
   } catch {
     S.serverOnline = false;
     dot.className  = 'dot';
-    label.textContent = 'Server offline — straight-line only';
+    label.textContent = 'Server offline - straight-line only';
   }
   updateButtonStates();
 }
@@ -382,7 +382,7 @@ function setDir(btn) {
 }
 
 function updateButtonStates() {
-  // Allow if server is online — pre-computed routes work without Anthropic key;
+  // Allow if server is online - pre-computed routes work without Anthropic key;
   // AI fallback will error gracefully if the key is missing.
   document.getElementById('btn-propose').disabled = !S.serverOnline;
 }
@@ -423,7 +423,7 @@ async function runShore() {
     km = haversineKm(start.lat, start.lon, end.lat, end.lon);
     mi = kmToMi(km);
     coords = null; seaRouted = false;
-    warning = 'Server offline — showing straight-line distance only. Start server.py for sea routing.';
+    warning = 'Server offline - showing straight-line distance only. Start server.py for sea routing.';
   }
 
   showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning });
@@ -431,14 +431,14 @@ async function runShore() {
 }
 
 function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, globeRouted, swimName, warning }) {
-  const label = globeRouted ? `Swimmable distance (GLOBE Dijkstra — verified${swimName ? ': ' + swimName : ''})`
+  const label = globeRouted ? `Swimmable distance (GLOBE Dijkstra - verified${swimName ? ': ' + swimName : ''})`
               : seaRouted   ? 'Swimmable distance (sea route)'
               : aiRouted    ? 'Swimmable distance (AI water path)'
               :                'Point-to-point distance (straight line)';
   document.getElementById('result-type-label').textContent = label;
   document.getElementById('result-km').textContent = f(km, 3) + ' km / ' + f(mi, 3) + ' mi';
   document.getElementById('result-mi').textContent = '';
-  const defaultNote = globeRouted ? 'GLOBE 925m Dijkstra routing — stress-tested zero land crossings. Suitable for WOWSA ratification.'
+  const defaultNote = globeRouted ? 'GLOBE 925m Dijkstra routing - stress-tested zero land crossings. Suitable for WOWSA ratification.'
                     : seaRouted   ? 'Sea-routed via searoute-py (avoids land). Suitable for WOWSA ratification.'
                     : aiRouted    ? 'AI-generated water path (non-ocean). Drag amber markers to correct any land crossings.'
                     :               '';
@@ -462,8 +462,8 @@ function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, glo
     drawFn = () => drawAiShoreRoute(coords, start, end);
   } else {
     const reason = warning && warning.includes('offline')
-      ? 'Server offline — straight-line shown for reference only'
-      : 'Straight-line reference — no water path available';
+      ? 'Server offline - straight-line shown for reference only'
+      : 'Straight-line reference - no water path available';
     drawFn = () => drawGeodesic(start, end, reason);
   }
   if (S.mapsStatus === 'ready') drawFn();
@@ -504,9 +504,9 @@ async function proposeWaypoints() {
     document.getElementById('wp-section').style.display = 'block';
 
     if (data.precomputed) {
-      // Pre-computed GLOBE route: show result immediately — no need to click Calculate
+      // Pre-computed GLOBE route: show result immediately - no need to click Calculate
       infoEl.innerHTML =
-        `<b style="color:#3fb950">✓ Pre-computed GLOBE route</b> — ${data.source}.<br>` +
+        `<b style="color:#3fb950">✓ Pre-computed GLOBE route</b> - ${data.source}.<br>` +
         `${S.waypoints.length} named waypoints. Displaying full computed path below.`;
       infoEl.style.display = 'block';
       document.getElementById('btn-circum-run').style.display = 'none';
@@ -525,22 +525,22 @@ async function proposeWaypoints() {
       const fromOsm   = data.source === 'osmnx';
       if (fromOsm && crossings === 0) {
         infoEl.innerHTML =
-          `<b style="color:#3fb950">✓ Route computed from OpenStreetMap boundary</b> — ` +
+          `<b style="color:#3fb950">✓ Route computed from OpenStreetMap boundary</b> - ` +
           `${S.waypoints.length} waypoints, zero land crossings. ` +
           `Verify on map, then run circumnavigation.`;
       } else if (fromOsm && crossings > 0) {
         infoEl.innerHTML =
-          `<b style="color:#3fb950">OpenStreetMap boundary route</b> — ${S.waypoints.length} waypoints. ` +
-          `<b style="color:#d29922">⚠ ${crossings} segment(s) near satellite islands</b> — ` +
+          `<b style="color:#3fb950">OpenStreetMap boundary route</b> - ${S.waypoints.length} waypoints. ` +
+          `<b style="color:#d29922">⚠ ${crossings} segment(s) near satellite islands</b> - ` +
           `drag markers to correct if needed.`;
       } else if (crossings === 0) {
         infoEl.innerHTML =
-          `<b style="color:#3fb950">✓ ${S.waypoints.length} AI waypoints — no land crossings detected.</b> ` +
+          `<b style="color:#3fb950">✓ ${S.waypoints.length} AI waypoints - no land crossings detected.</b> ` +
           `Verify on map, then run circumnavigation.`;
       } else {
         infoEl.innerHTML =
           `${S.waypoints.length} AI waypoints generated. ` +
-          `<b style="color:#d29922">⚠ ${crossings} segment(s) may still cross land</b> — ` +
+          `<b style="color:#d29922">⚠ ${crossings} segment(s) may still cross land</b> - ` +
           `drag markers to correct, then run circumnavigation.`;
       }
       infoEl.style.display = 'block';
@@ -580,16 +580,16 @@ function showCircumResults(data) {
 
   if (data.precomputed) {
     document.getElementById('result-type-label').textContent =
-      'Circumnavigation distance (GLOBE Dijkstra — verified)';
+      'Circumnavigation distance (GLOBE Dijkstra - verified)';
     document.getElementById('result-note').textContent =
-      `${data.source} — stress-tested: zero land crossings.`;
+      `${data.source} - stress-tested: zero land crossings.`;
   } else {
     const hasHaversine = data.legs && data.legs.some(l => l.method === 'haversine');
     const method = hasHaversine ? 'sea route + straight-line fallback' : 'sea route';
     document.getElementById('result-type-label').textContent =
       `Circumnavigation distance (${method})`;
     document.getElementById('result-note').textContent =
-      `${data.waypoints_used.length} waypoints — sea-routed via searoute-py.`;
+      `${data.waypoints_used.length} waypoints - sea-routed via searoute-py.`;
   }
   document.getElementById('result-km').textContent =
     f(data.total_distance_km, 3) + ' km / ' + f(data.total_distance_miles, 3) + ' mi';
@@ -756,7 +756,7 @@ function drawSeaRoute(coords, start, end) {
 }
 
 function drawGlobeShoreRoute(coords, start, end) {
-  // Green verified path — GLOBE Dijkstra, zero land crossings
+  // Green verified path - GLOBE Dijkstra, zero land crossings
   const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
   const map  = getMap(path[0], 8);
   S.routePolyline = new google.maps.Polyline({
@@ -769,14 +769,14 @@ function drawGlobeShoreRoute(coords, start, end) {
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
   document.getElementById('map-caption').textContent =
-    'GLOBE Dijkstra route — verified zero land crossings';
+    'GLOBE Dijkstra route - verified zero land crossings';
 }
 
 function drawGeodesic(start, end, reason) {
   const s = { lat: start.lat, lng: start.lon };
   const e = { lat: end.lat,   lng: end.lon   };
   const map = getMap(s, 5);
-  // Grey dashed line — clearly NOT a swimmable route
+  // Grey dashed line - clearly NOT a swimmable route
   S.routePolyline = new google.maps.Polyline({
     path: [s, e], map, geodesic: true,
     strokeColor: '#6e7681', strokeOpacity: 0.5, strokeWeight: 2,
@@ -789,7 +789,7 @@ function drawGeodesic(start, end, reason) {
   b.extend(s); b.extend(e);
   map.fitBounds(b);
   document.getElementById('map-caption').textContent =
-    reason || 'Straight-line reference only — not a swimmable route';
+    reason || 'Straight-line reference only - not a swimmable route';
 }
 
 function drawAiShoreRoute(coords, start, end) {
@@ -804,7 +804,7 @@ function drawAiShoreRoute(coords, start, end) {
   S.endpointMarkers.push(new google.maps.Marker({ position: path[0],               map, icon: markerIcon('#3fb950'), title: 'Start' }));
   S.endpointMarkers.push(new google.maps.Marker({ position: path[path.length - 1], map, icon: markerIcon('#f85149'), title: 'End'   }));
 
-  // Draggable intermediate markers — user can correct AI mistakes
+  // Draggable intermediate markers - user can correct AI mistakes
   S.aiShoreWaypoints = coords.map(c => ({ lat: c[1], lon: c[0] }));
   S.aiShoreMarkers = [];
   const infoW = new google.maps.InfoWindow();
@@ -845,7 +845,7 @@ function drawAiShoreRoute(coords, start, end) {
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
   document.getElementById('map-caption').textContent =
-    'AI-generated water path — drag amber markers to correct any land crossings';
+    'AI-generated water path - drag amber markers to correct any land crossings';
 }
 
 function drawCircumRoute(coords, wps) {
@@ -859,18 +859,18 @@ function drawCircumRoute(coords, wps) {
   const b = new google.maps.LatLngBounds();
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
-  document.getElementById('map-caption').textContent = 'Sea route via searoute-py — click markers for coordinates';
+  document.getElementById('map-caption').textContent = 'Sea route via searoute-py - click markers for coordinates';
 }
 
 function drawGlobeRoute(coords, wps) {
-  // Dense path from GLOBE Dijkstra computation — coords are [lon, lat]
+  // Dense path from GLOBE Dijkstra computation - coords are [lon, lat]
   const path = coords.map(c => ({ lat: c[1], lng: c[0] }));
   const map  = getMap(path[0], 6);
   S.routePolyline = new google.maps.Polyline({
     path, map, geodesic: false,
     strokeColor: '#3fb950', strokeOpacity: 0.85, strokeWeight: 3,
   });
-  // Named waypoint markers — show name in info window
+  // Named waypoint markers - show name in info window
   const info = new google.maps.InfoWindow();
   wps.forEach((wp, i) => {
     const pos = { lat: wp.lat, lng: wp.lon };
@@ -891,7 +891,7 @@ function drawGlobeRoute(coords, wps) {
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
   document.getElementById('map-caption').textContent =
-    'GLOBE Dijkstra route — verified zero land crossings — click markers for waypoint names';
+    'GLOBE Dijkstra route - verified zero land crossings - click markers for waypoint names';
 }
 
 function addWaypointMarkers(map, wps, draggable = false) {
@@ -953,7 +953,7 @@ function _updatePreviewDistance() {
     total += haversineKm(loop[j].lat, loop[j].lon, loop[j+1].lat, loop[j+1].lon);
   const infoEl = document.getElementById('circum-info');
   if (infoEl && infoEl.style.display !== 'none') {
-    // Update only the distance part — preserve any land-crossing warning
+    // Update only the distance part - preserve any land-crossing warning
     const note = `Estimated perimeter: <b>${f(total, 1)} km / ${f(total * 0.621371, 1)} mi</b> (straight-line segments)`;
     // Only replace if no pre-computed text is there
     if (!infoEl.innerHTML.includes('GLOBE')) infoEl.innerHTML = note;
@@ -977,7 +977,7 @@ function previewWaypointsOnMap() {
   S.waypoints.forEach(w => b.extend({ lat: w.lat, lng: w.lon }));
   map.fitBounds(b);
   document.getElementById('map-caption').textContent =
-    'Drag markers to adjust — distance updates live as you drag';
+    'Drag markers to adjust - distance updates live as you drag';
   _updatePreviewDistance();
 }
 
