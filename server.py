@@ -642,4 +642,4 @@ if __name__ == '__main__':
     print(f'  Google Maps key: {"✓ configured" if MAPS_KEY else "not set — interactive map disabled"}')
     print(f'  Anthropic key:   {"✓ configured" if ANTHROPIC_KEY else "not set — AI waypoints disabled"}')
     print()
-    app.run(port=PORT, debug=False)
+    app.run(host='0.0.0.0', port=PORT, debug=False)
