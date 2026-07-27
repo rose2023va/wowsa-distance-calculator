@@ -8,3 +8,4 @@ pyshp
 numpy
 osmnx
 pyproj
+psycopg2-binary

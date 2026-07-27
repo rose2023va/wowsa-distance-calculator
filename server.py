@@ -36,7 +36,113 @@ except ImportError:
     MAPS_KEY      = os.environ.get('GOOGLE_MAPS_API_KEY', '')
     ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
-PORT = int(os.environ.get('PORT', 5050))
+PORT        = int(os.environ.get('PORT', 5050))
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+
+# ── Database ───────────────────────────────────────────────────────────────────
+
+def _db_conn():
+    if not DATABASE_URL:
+        return None
+    try:
+        import psycopg2
+        return psycopg2.connect(DATABASE_URL)
+    except Exception as e:
+        print(f'DB connect error: {e}')
+        return None
+
+def _db_init():
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS shore_routes (
+                    id            SERIAL PRIMARY KEY,
+                    start_lat     DOUBLE PRECISION NOT NULL,
+                    start_lon     DOUBLE PRECISION NOT NULL,
+                    end_lat       DOUBLE PRECISION NOT NULL,
+                    end_lon       DOUBLE PRECISION NOT NULL,
+                    distance_km   DOUBLE PRECISION NOT NULL,
+                    distance_miles DOUBLE PRECISION NOT NULL,
+                    path          JSONB,
+                    route_type    VARCHAR(20),
+                    warning       TEXT,
+                    created_at    TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            conn.commit()
+        print('DB ready.')
+    except Exception as e:
+        print(f'DB init error: {e}')
+    finally:
+        conn.close()
+
+def _db_lookup(start_lat, start_lon, end_lat, end_lon, tolerance_km=0.5):
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT start_lat, start_lon, end_lat, end_lon,
+                       distance_km, distance_miles, path, route_type, warning
+                FROM shore_routes
+                WHERE ABS(start_lat - %s) < 0.01 AND ABS(start_lon - %s) < 0.01
+                  AND ABS(end_lat   - %s) < 0.01 AND ABS(end_lon   - %s) < 0.01
+            """, (start_lat, start_lon, end_lat, end_lon))
+            rows = cur.fetchall()
+        for row in rows:
+            slat, slon, elat, elon, km, mi, path, rtype, warn = row
+            forward = (_haversine_km(start_lat, start_lon, slat, slon) < tolerance_km and
+                       _haversine_km(end_lat,   end_lon,   elat, elon) < tolerance_km)
+            reverse = (_haversine_km(start_lat, start_lon, elat, elon) < tolerance_km and
+                       _haversine_km(end_lat,   end_lon,   slat, slon) < tolerance_km)
+            if forward or reverse:
+                coords = path if path else None
+                if reverse and coords:
+                    coords = list(reversed(coords))
+                return {
+                    'distance_km':    km,
+                    'distance_miles': mi,
+                    'coordinates':    coords,
+                    'sea_routed':     rtype == 'sea',
+                    'ai_routed':      False,
+                    'globe_routed':   rtype == 'globe',
+                    'warning':        warn,
+                }
+        return None
+    except Exception as e:
+        print(f'DB lookup error: {e}')
+        return None
+    finally:
+        conn.close()
+
+def _db_save(start_lat, start_lon, end_lat, end_lon, result, route_type):
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO shore_routes
+                    (start_lat, start_lon, end_lat, end_lon,
+                     distance_km, distance_miles, path, route_type, warning)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                start_lat, start_lon, end_lat, end_lon,
+                result['distance_km'], result['distance_miles'],
+                json.dumps(result.get('coordinates')),
+                route_type,
+                result.get('warning'),
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f'DB save error: {e}')
+    finally:
+        conn.close()
 
 
 # ── Static ─────────────────────────────────────────────────────────────────────
@@ -113,6 +219,11 @@ def api_calculate():
     if globe_result:
         return jsonify(globe_result)
 
+    # ── Database lookup (second priority) ─────────────────────────────────────
+    db_result = _db_lookup(origin[1], origin[0], dest[1], dest[0])
+    if db_result:
+        return jsonify(db_result)
+
     try:
         result = calculate(origin, dest)
         coords = result['geojson']['geometry']['coordinates']
@@ -137,35 +248,38 @@ def api_calculate():
 
         if needs_ai:
             km = _haversine_km(origin[1], origin[0], dest[1], dest[0])
-            # Check if the direct path crosses land
             direct = [origin, dest]
             seg_problems, _ = _check_segments_land(direct)
             if not seg_problems:
-                # Clear open water - straight line is the correct standardized distance
-                return jsonify({
+                out = {
                     'distance_km':    round(km, 3),
                     'distance_miles': round(km_to_miles(km), 3),
                     'coordinates':    direct,
                     'sea_routed':     False,
                     'ai_routed':      False,
                     'warning':        None,
-                })
-            # Land in the way - return straight-line with a note that pre-computation is needed
-            return jsonify({
+                }
+                _db_save(origin[1], origin[0], dest[1], dest[0], out, 'straight')
+                return jsonify(out)
+            out = {
                 'distance_km':    round(km, 3),
                 'distance_miles': round(km_to_miles(km), 3),
                 'coordinates':    direct,
                 'sea_routed':     False,
                 'ai_routed':      False,
                 'warning':        'Land detected on direct path. Straight-line distance shown. This route requires a pre-computed GLOBE route for an accurate swimmable distance.',
-            })
+            }
+            return jsonify(out)
 
-        return jsonify({
+        out = {
             'distance_km':    result['distance_km'],
             'distance_miles': result['distance_miles'],
             'coordinates':    coords,
             'sea_routed':     True,
-        })
+            'warning':        None,
+        }
+        _db_save(origin[1], origin[0], dest[1], dest[0], out, 'sea')
+        return jsonify(out)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -648,7 +762,8 @@ def api_propose_waypoints():
 
 
 if __name__ == '__main__':
-    print(f'\nWOWSA API Server  →  http://localhost:{PORT}')
+    _db_init()
+    print(f'\nWOWSA API Server  ->  http://localhost:{PORT}')
     print(f'  Google Maps key: {"✓ configured" if MAPS_KEY else "not set - interactive map disabled"}')
     print(f'  Anthropic key:   {"✓ configured" if ANTHROPIC_KEY else "not set - AI waypoints disabled"}')
     print()
