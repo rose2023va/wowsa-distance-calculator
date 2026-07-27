@@ -136,6 +136,21 @@ def api_calculate():
                 needs_ai = True
 
         if needs_ai:
+            # Check if the direct line between the two points crosses land.
+            # If it doesn't, just return the straight-line distance — no AI needed.
+            direct = [origin, dest]
+            seg_problems, _ = _check_segments_land(direct)
+            if not seg_problems:
+                km = _haversine_km(origin[1], origin[0], dest[1], dest[0])
+                return jsonify({
+                    'distance_km':    round(km, 3),
+                    'distance_miles': round(km_to_miles(km), 3),
+                    'coordinates':    direct,
+                    'sea_routed':     False,
+                    'ai_routed':      False,
+                    'warning':        None,
+                })
+            # Direct path crosses land — use AI to route around it
             ai_result = _ai_route_shore(origin, dest)
             if ai_result:
                 return jsonify(ai_result)
