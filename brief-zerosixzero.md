@@ -28,15 +28,19 @@ Saving is manual and intentional: a WOWSA team member reviews the calculated rou
 
 ### Circumnavigation
 
-This is harder, and meaningfully different from a crossing.
+This is harder, and the input is fundamentally different from a crossing - which is why it works differently in the tool.
 
-A shore-to-shore crossing has two fixed endpoints - the distance is determined by the geography between them. A circumnavigation has no fixed waypoints. "Around Ireland" could mean 500 meters offshore or 5 kilometers offshore. The choice of where to place the waypoints is itself a judgment call, and that judgment determines the distance.
+A shore-to-shore crossing takes two coordinates. The route is defined entirely by the geography between them: give the tool a start and an end, and there is one correct shortest-water-path answer.
 
-The current approach: fetch the island boundary from OpenStreetMap, buffer 900 meters offshore, and sample evenly-spaced waypoints around the perimeter. When that fails (island not in OSM, or generated points land on terrain), Claude AI generates the waypoints with a self-check against land data. A human reviews every waypoint on the map before the calculation runs.
+A circumnavigation cannot work this way. The start and end are the same point - it is a loop. Two coordinates tell you nothing about the route. "Around Ireland" could mean 500 meters offshore or 5 kilometers offshore, clockwise or counterclockwise, and the resulting distance changes significantly depending on those choices. The route cannot be derived from coordinates alone; it has to be defined.
+
+So the input is different: a landmass name, a direction (clockwise or counterclockwise), and a waypoint count. The tool constructs the route from there - it fetches the island boundary from OpenStreetMap, buffers 900 meters offshore, and samples evenly-spaced waypoints around the perimeter. Those waypoints define the course. The official distance is the sum of the legs connecting them.
+
+When OpenStreetMap does not have the boundary, Claude AI proposes the waypoints and self-checks them against land polygon data. Either way, a human reviews every waypoint on the map before any distance is calculated.
 
 Routing between waypoints uses a maritime routing library. This is where accuracy degrades: in narrow passages between an island and the mainland, the routing either fails or clips land. In open water it works; close to shore it struggles.
 
-**Circumnavigation is started but not yet accurate.** Ireland is the only completed course - it was pre-computed using a more careful Dijkstra-based approach and stored as a verified file. For other islands, the waypoint generation works but the leg routing is not reliable enough to produce a ratifiable distance.
+**Circumnavigation is started but not yet accurate.** Ireland is the only completed course - pre-computed using a more careful method and stored as a verified file. For other islands, the waypoint generation works but the leg routing is not reliable enough to produce a ratifiable distance.
 
 ---
 
