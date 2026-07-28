@@ -42,13 +42,13 @@ The tool fetches the island boundary from OpenStreetMap and projects it into UTM
 
 When OpenStreetMap does not have the boundary - or when the generated waypoints still land on terrain - Claude AI proposes the waypoints instead. The AI proposal goes through a land-crossing validation pass using a Natural Earth polygon dataset. Any segment that crosses land, or any waypoint placed on land, is flagged and sent back to the AI for a correction pass before the user sees anything.
 
-The user sees the waypoints on a map and can drag any of them to adjust position. Once satisfied, they click Run to calculate the total distance.
+Each leg between consecutive waypoints is routed using the same GLOBE A* approach as shore-to-shore crossings - finding the shortest all-water path through the GLOBE land mask. The full route renders on the map, and the user can drag any waypoint to adjust its position and re-run the calculation.
 
 **Where it still needs work:**
 
 The 900-meter offshore buffer is consistent in concept but not always in practice. Headlands and peninsulas cause the evenly-spaced sampling to bunch up in tight areas. Satellite rocks not in OpenStreetMap are not detected. The AI fallback produces different waypoints each time for the same island and is unreliable for complex coastlines.
 
-The leg routing now uses GLOBE A* - each segment between consecutive waypoints finds the shortest all-water path through the GLOBE land mask. This is accurate close to shore. The remaining weakness is the waypoint placement itself: the generated waypoints define the course, and if they are not placed consistently at the right offshore distance, the total distance varies. A swimmer adjusting the waypoints manually gets a different number than the auto-generated default.
+The remaining weakness is the waypoint placement itself. The generated waypoints define the course, and if they are not placed consistently at the right offshore distance, the total distance varies. A swimmer adjusting the waypoints manually gets a different number than the auto-generated default.
 
 **Current status:** Ireland is the only completed and saved course. For other islands, the tool generates a usable starting point that can be adjusted and saved, but the auto-generated waypoint placement is not yet reliable enough to produce a ratifiable distance without review.
 
@@ -82,8 +82,6 @@ All files are in the [wowsa-distance-calculator](https://github.com/rose2023va/w
 |---|---|
 | [server.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/server.py) | Flask API. All endpoints: calculate, save-route, propose-waypoints, circumnavigate. GLOBE A* routing engine and PostgreSQL logic. |
 | [index.html](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/index.html) | Web interface with Google Maps. Shore-to-shore and circumnavigation modes, draggable waypoints, "Add to database" flow. |
-| [circumnavigation.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/circumnavigation.py) | Takes an ordered list of waypoints and calculates total loop distance leg by leg. |
-| [calculate.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/calculate.py) | Maritime routing wrapper, used for circumnavigation leg routing. |
 | [propose-waypoints.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/propose-waypoints.py) | CLI tool for generating initial offshore waypoints from an island boundary. |
 | [route_ireland.json](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/route_ireland.json) | Pre-computed verified route for Ireland circumnavigation. |
 | [requirements.txt](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/requirements.txt) | Python dependencies including global-land-mask for GLOBE routing. |
