@@ -82,6 +82,12 @@ All files are in the [wowsa-distance-calculator](https://github.com/rose2023va/w
 |---|---|
 | [server.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/server.py) | Flask API. All endpoints: calculate, save-route, propose-waypoints, circumnavigate. GLOBE A* routing engine and PostgreSQL logic. |
 | [index.html](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/index.html) | Web interface with Google Maps. Shore-to-shore and circumnavigation modes, draggable waypoints, "Add to database" flow. |
+| [circumnavigation.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/circumnavigation.py) | Original CLI calculator for looped waypoint routes. Superseded by the GLOBE A* leg routing in server.py but kept for reference. |
+| [calculate.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/calculate.py) | Original CLI shore-to-shore calculator using searoute-py. Unit conversion helpers still used by server.py. |
 | [propose-waypoints.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/propose-waypoints.py) | CLI tool for generating initial offshore waypoints from an island boundary. |
+| [map_output.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/map_output.py) | Shared Google Maps HTML output used by the CLI tools. Generates a self-contained map file and opens it in the browser. |
+| [METHODOLOGY.md](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/METHODOLOGY.md) | Documents the calculation methodology and defensibility criteria. |
+| [README.md](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/README.md) | Setup, API reference, and deployment instructions. |
 | [route_ireland.json](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/route_ireland.json) | Pre-computed verified route for Ireland circumnavigation. |
 | [requirements.txt](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/requirements.txt) | Python dependencies including global-land-mask for GLOBE routing. |
+| [Procfile](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/Procfile) | Railway deployment command. |
