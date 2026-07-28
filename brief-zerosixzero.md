@@ -44,13 +44,13 @@ When OpenStreetMap does not have the boundary - or when the generated waypoints 
 
 The user sees the waypoints on a map and can drag any of them to adjust position. Once satisfied, they click Run to calculate the total distance.
 
-**Where it still fails:**
+**Where it still needs work:**
 
 The 900-meter offshore buffer is consistent in concept but not always in practice. Headlands and peninsulas cause the evenly-spaced sampling to bunch up in tight areas. Satellite rocks not in OpenStreetMap are not detected. The AI fallback produces different waypoints each time for the same island and is unreliable for complex coastlines.
 
-The deeper problem is the routing between waypoints. The current implementation uses a maritime routing library built for commercial shipping lanes. This works in open ocean but produces wrong results close to shore - which is exactly where circumnavigation legs run. The same GLOBE A* approach used for shore-to-shore crossings would solve this for circumnavigation legs too, but it has not been applied there yet.
+The leg routing now uses GLOBE A* - each segment between consecutive waypoints finds the shortest all-water path through the GLOBE land mask. This is accurate close to shore. The remaining weakness is the waypoint placement itself: the generated waypoints define the course, and if they are not placed consistently at the right offshore distance, the total distance varies. A swimmer adjusting the waypoints manually gets a different number than the auto-generated default.
 
-**Current status:** Ireland is the only completed course, pre-computed manually and stored as a verified file. For other islands, the waypoint generation produces a usable starting point but the leg routing is not accurate enough to produce a ratifiable distance without significant manual correction.
+**Current status:** Ireland is the only completed and saved course. For other islands, the tool generates a usable starting point that can be adjusted and saved, but the auto-generated waypoint placement is not yet reliable enough to produce a ratifiable distance without review.
 
 ---
 

@@ -642,12 +642,15 @@ function showCircumResults(data) {
     document.getElementById('result-note').textContent =
       `${data.source} - stress-tested: zero land crossings.`;
   } else {
+    const hasGlobe    = data.legs && data.legs.some(l => l.method === 'globe');
     const hasHaversine = data.legs && data.legs.some(l => l.method === 'haversine');
-    const method = hasHaversine ? 'sea route + straight-line fallback' : 'sea route';
+    const method = hasGlobe     ? 'GLOBE A*'
+                 : hasHaversine ? 'sea route + straight-line fallback'
+                 :                'sea route';
     document.getElementById('result-type-label').textContent =
       `Circumnavigation distance (${method})`;
     document.getElementById('result-note').textContent =
-      `${data.waypoints_used.length} waypoints - sea-routed via searoute-py.`;
+      `${data.waypoints_used.length} waypoints - ${hasGlobe ? 'GLOBE A* routing per leg' : 'sea-routed via searoute-py'}.`;
   }
   document.getElementById('result-km').textContent =
     f(data.total_distance_km, 3) + ' km / ' + f(data.total_distance_miles, 3) + ' mi';
@@ -927,11 +930,12 @@ function drawCircumRoute(coords, wps) {
     path, map, geodesic: false,
     strokeColor: '#58a6ff', strokeOpacity: 0.9, strokeWeight: 3,
   });
-  addWaypointMarkers(map, wps.map(w => ({ lat: w.lat, lon: w.lon })));
+  addWaypointMarkers(map, wps.map(w => ({ lat: w.lat, lon: w.lon })), true);
   const b = new google.maps.LatLngBounds();
   path.forEach(p => b.extend(p));
   map.fitBounds(b);
-  document.getElementById('map-caption').textContent = 'Sea route via searoute-py - click markers for coordinates';
+  document.getElementById('map-caption').textContent =
+    'GLOBE A* route - drag markers to adjust then re-run';
 }
 
 function drawGlobeRoute(coords, wps) {

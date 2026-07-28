@@ -734,10 +734,45 @@ def _interior_crosses_land(wpt_a, wpt_b, n=20):
 def api_circumnavigate():
     d = request.get_json()
     try:
-        from circumnavigation import circumnavigate
-        wp = [[float(w['lon']), float(w['lat'])] for w in d['waypoints']]
-        result = circumnavigate(wp)
-        return jsonify(result)
+        from calculate import km_to_miles
+        waypoints = d['waypoints']
+        if len(waypoints) < 2:
+            return jsonify({'error': 'Need at least 2 waypoints'}), 400
+
+        total_km  = 0.0
+        all_coords = []
+        legs = []
+
+        wp_loop = waypoints + [waypoints[0]]  # close the loop
+        for i in range(len(wp_loop) - 1):
+            a = wp_loop[i]
+            b = wp_loop[i + 1]
+            leg = _globe_route_on_demand(
+                float(a['lat']), float(a['lon']),
+                float(b['lat']), float(b['lon'])
+            )
+            leg_km = leg['distance_km']
+            total_km += leg_km
+            coords = leg['coordinates']
+            if all_coords:
+                all_coords.extend(coords[1:])   # skip duplicate junction point
+            else:
+                all_coords.extend(coords)
+            legs.append({
+                'leg':            i + 1,
+                'distance_km':    round(leg_km, 3),
+                'distance_miles': round(km_to_miles(leg_km), 3),
+                'method':         'globe',
+            })
+
+        return jsonify({
+            'total_distance_km':    round(total_km, 3),
+            'total_distance_miles': round(km_to_miles(total_km), 3),
+            'waypoints_used':       waypoints,
+            'route_coordinates':    all_coords,
+            'legs':                 legs,
+            'warning':              None,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
