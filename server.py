@@ -76,10 +76,84 @@ def _db_init():
             """)
             # Migration: add name column to existing tables
             cur.execute("ALTER TABLE shore_routes ADD COLUMN IF NOT EXISTS name VARCHAR(200)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS circum_routes (
+                    id             SERIAL PRIMARY KEY,
+                    landmass       VARCHAR(200) NOT NULL,
+                    name           VARCHAR(200),
+                    distance_km    DOUBLE PRECISION NOT NULL,
+                    distance_miles DOUBLE PRECISION NOT NULL,
+                    waypoints      JSONB,
+                    path           JSONB,
+                    created_at     TIMESTAMP DEFAULT NOW()
+                )
+            """)
             conn.commit()
         print('DB ready.')
     except Exception as e:
         print(f'DB init error: {e}')
+    finally:
+        conn.close()
+
+
+def _db_lookup_circum(landmass):
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        slug = landmass.lower().strip()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT name, distance_km, distance_miles, waypoints, path
+                FROM circum_routes
+                WHERE LOWER(landmass) = %s
+                ORDER BY created_at DESC LIMIT 1
+            """, (slug,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        name, km, mi, waypoints, path = row
+        return {
+            'precomputed':          True,
+            'from_db':              True,
+            'source':               f'Saved route: {name}',
+            'distance_km':          km,
+            'distance_miles':       mi,
+            'waypoints':            waypoints or [],
+            'waypoint_names':       [w.get('name', '') for w in (waypoints or [])],
+            'path':                 path or [],
+            'segments':             [],
+            'swim_name':            name,
+        }
+    except Exception as e:
+        print(f'DB circum lookup error: {e}')
+        return None
+    finally:
+        conn.close()
+
+
+def _db_save_circum(landmass, name, result):
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        wps = [{'lat': w['lat'], 'lon': w['lon']} for w in (result.get('waypoints_used') or [])]
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO circum_routes
+                    (landmass, name, distance_km, distance_miles, waypoints, path)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                landmass.lower().strip(),
+                name,
+                result['total_distance_km'],
+                result['total_distance_miles'],
+                json.dumps(wps),
+                json.dumps(result.get('route_coordinates')),
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f'DB circum save error: {e}')
     finally:
         conn.close()
 
@@ -382,6 +456,19 @@ def _globe_route_on_demand(start_lat, start_lon, end_lat, end_lon):
     except Exception as e:
         print(f'Globe on-demand error: {e}')
         return None
+
+
+@app.route('/api/save-circumnavigation', methods=['POST'])
+def api_save_circumnavigation():
+    d = request.get_json()
+    name     = (d.get('name') or '').strip()
+    landmass = (d.get('landmass') or '').strip()
+    if not name:
+        return jsonify({'error': 'Route name is required'}), 400
+    if not landmass:
+        return jsonify({'error': 'Landmass name is required'}), 400
+    _db_save_circum(landmass, name, d)
+    return jsonify({'ok': True, 'name': name})
 
 
 @app.route('/api/save-route', methods=['POST'])
@@ -794,6 +881,11 @@ def api_propose_waypoints():
             })
         except Exception as e:
             return jsonify({'error': f'Failed to load pre-computed route: {e}'}), 500
+
+    # ── Database lookup (second priority) ─────────────────────────────────────
+    db_circum = _db_lookup_circum(landmass)
+    if db_circum:
+        return jsonify(db_circum)
 
     # ── Geographic agent: OSMnx boundary → 900 m buffer → evenly-spaced points ─
     direction = d.get('direction', 'clockwise')

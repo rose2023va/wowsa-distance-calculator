@@ -20,27 +20,37 @@ These are fundamentally different problems, which is why they are handled separa
 
 Two coordinates go in. The tool finds the shortest path through water between them - avoiding every coastline, headland, and island along the way - and returns that distance as the official measurement for that crossing.
 
-This is the more mature of the two. The routing uses the GLOBE dataset (a 925-meter resolution global land mask) combined with A* pathfinding. It builds a water grid over the bounding box of the two coordinates, finds the shortest all-water path, and applies line-of-sight smoothing to produce a clean route line. Result is accurate to within the grid resolution, typically under 100 meters on a 30-40 km crossing.
+This is the more complete of the two. The routing uses the GLOBE dataset (a 925-meter resolution global land mask) combined with A* pathfinding. It builds a water grid over the bounding box of the two coordinates, finds the shortest all-water path, and applies line-of-sight smoothing to produce a clean route line. Accurate to within the grid resolution, typically under 100 meters on a 30-40 km crossing.
 
-The swimmer's GPS track is separate. Their GPX shows where they actually swam. The official route shows the standardized path. Both go on the map, overlaid - what was swum versus what is defined.
+The swimmer's GPS track is separate. Their GPX shows where they actually swam. The official route shows the standardized path. Both go on the map, overlaid.
 
-Saving is manual and intentional: a WOWSA team member reviews the calculated route, enters a name, and clicks "Add to database." From that point the distance is locked. Any future query for those coordinates returns the saved result with no recalculation.
+Saving is manual: a WOWSA team member reviews the calculated route, enters a name, and clicks "Add to database." From that point the distance is locked. Any future query for those coordinates returns the saved result with no recalculation.
 
 ### Circumnavigation
 
-This is harder, and the input is fundamentally different from a crossing - which is why it works differently in the tool.
+This is harder, and the input is fundamentally different from a crossing.
 
-A shore-to-shore crossing takes two coordinates. The route is defined entirely by the geography between them: give the tool a start and an end, and there is one correct shortest-water-path answer.
+A shore-to-shore crossing takes two coordinates. The route is defined entirely by the geography between them - give the tool a start and an end, and there is one correct answer.
 
 A circumnavigation cannot work this way. The start and end are the same point - it is a loop. Two coordinates tell you nothing about the route. "Around Ireland" could mean 500 meters offshore or 5 kilometers offshore, clockwise or counterclockwise, and the resulting distance changes significantly depending on those choices. The route cannot be derived from coordinates alone; it has to be defined.
 
-So the input is different: a landmass name, a direction (clockwise or counterclockwise), and a waypoint count. The tool constructs the route from there - it fetches the island boundary from OpenStreetMap, buffers 900 meters offshore, and samples evenly-spaced waypoints around the perimeter. Those waypoints define the course. The official distance is the sum of the legs connecting them.
+So the input is different: a landmass name, a direction (clockwise or counterclockwise), and a waypoint count. The tool constructs the route from there.
 
-When OpenStreetMap does not have the boundary, Claude AI proposes the waypoints and self-checks them against land polygon data. Either way, a human reviews every waypoint on the map before any distance is calculated.
+**What it does now:**
 
-Routing between waypoints uses a maritime routing library. This is where accuracy degrades: in narrow passages between an island and the mainland, the routing either fails or clips land. In open water it works; close to shore it struggles.
+The tool fetches the island boundary from OpenStreetMap and projects it into UTM coordinates for accurate metre-based calculations. It buffers 900 meters offshore, samples evenly-spaced waypoints around that perimeter, then checks whether the buffer ring crosses any nearby satellite islands or rocks. If it does, it absorbs those features into the union before re-running the buffer, so the ring routes around them. The sampled waypoints define the course. The official distance is the sum of the legs connecting them.
 
-**Circumnavigation is started but not yet accurate.** Ireland is the only completed course - pre-computed using a more careful method and stored as a verified file. For other islands, the waypoint generation works but the leg routing is not reliable enough to produce a ratifiable distance.
+When OpenStreetMap does not have the boundary - or when the generated waypoints still land on terrain - Claude AI proposes the waypoints instead. The AI proposal goes through a land-crossing validation pass using a Natural Earth polygon dataset. Any segment that crosses land, or any waypoint placed on land, is flagged and sent back to the AI for a correction pass before the user sees anything.
+
+The user sees the waypoints on a map and can drag any of them to adjust position. Once satisfied, they click Run to calculate the total distance.
+
+**Where it still fails:**
+
+The 900-meter offshore buffer is consistent in concept but not always in practice. Headlands and peninsulas cause the evenly-spaced sampling to bunch up in tight areas. Satellite rocks not in OpenStreetMap are not detected. The AI fallback produces different waypoints each time for the same island and is unreliable for complex coastlines.
+
+The deeper problem is the routing between waypoints. The current implementation uses a maritime routing library built for commercial shipping lanes. This works in open ocean but produces wrong results close to shore - which is exactly where circumnavigation legs run. The same GLOBE A* approach used for shore-to-shore crossings would solve this for circumnavigation legs too, but it has not been applied there yet.
+
+**Current status:** Ireland is the only completed course, pre-computed manually and stored as a verified file. For other islands, the waypoint generation produces a usable starting point but the leg routing is not accurate enough to produce a ratifiable distance without significant manual correction.
 
 ---
 
@@ -50,7 +60,7 @@ Routing between waypoints uses a maritime routing library. This is where accurac
 
 **Map integration.** ZeroSixZero's existing map already shows the swimmer's GPS track. The second layer - WOWSA's official route - goes on the same map. Both paths on one view: what the swimmer actually swam versus what the standardized route is.
 
-**Input on circumnavigation.** This is the part we most want to discuss. Circumnavigation accuracy depends on how precisely the route can be kept in water around complex coastlines. ZeroSixZero's experience with maritime routing and coastal data may point to a better approach than what we have now - whether that is a different routing method, a dataset we are not using, or a methodology for defining offshore waypoints that produces consistent results across different islands. Any input on what has worked for similar problems would help us get this right.
+**Input on circumnavigation.** This is the part we most want to discuss. The waypoint placement and leg routing close to shore is where accuracy breaks down. Specifically: we need the offshore path between consecutive waypoints to follow the water accurately close to the coastline, and the waypoint placement itself to land consistently at a defined distance from shore regardless of how complex or irregular the coastline is. If you have worked on something similar or know of an approach that holds up for tight coastal geometry, we would like to hear how you have handled it.
 
 ---
 
@@ -58,7 +68,7 @@ Routing between waypoints uses a maritime routing library. This is where accurac
 
 The database is the source of truth. A distance becomes official when a WOWSA team member saves it with a route name. Before it is saved, it is just a calculation. After it is saved, it is the number.
 
-This matters because the same coordinates queried twice should always return the same result. Without the database, two people calculating the same crossing on different days could get slightly different distances depending on the routing at that moment. With it, the first verified result is the permanent one.
+This applies to both crossing and circumnavigation. The same coordinates or the same island queried twice should always return the same result.
 
 ---
 
@@ -69,7 +79,7 @@ All files are in the [wowsa-distance-calculator](https://github.com/rose2023va/w
 | File | What it does |
 |---|---|
 | [server.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/server.py) | Flask API. All endpoints: calculate, save-route, propose-waypoints, circumnavigate. GLOBE A* routing engine and PostgreSQL logic. |
-| [index.html](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/index.html) | Web interface with Google Maps. Shore-to-shore and circumnavigation modes, map review, "Add to database" flow. |
+| [index.html](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/index.html) | Web interface with Google Maps. Shore-to-shore and circumnavigation modes, draggable waypoints, "Add to database" flow. |
 | [circumnavigation.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/circumnavigation.py) | Takes an ordered list of waypoints and calculates total loop distance leg by leg. |
 | [calculate.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/calculate.py) | Maritime routing wrapper, used for circumnavigation leg routing. |
 | [propose-waypoints.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/propose-waypoints.py) | CLI tool for generating initial offshore waypoints from an island boundary. |

@@ -237,7 +237,7 @@ input[type=text]::placeholder { color: #30363d; }
 
     <div id="dl-btn-wrap"></div>
 
-    <!-- Save to database (shown only for fresh, unsaved results) -->
+    <!-- Save shore-to-shore to database (shown only for fresh, unsaved results) -->
     <div id="save-section" style="display:none; margin-top:4px;">
       <div class="card" style="border-color:#238636;">
         <div class="card-label" style="color:#3fb950;">Add to database</div>
@@ -249,6 +249,21 @@ input[type=text]::placeholder { color: #30363d; }
           <button class="btn-primary" id="btn-save-route" onclick="saveRoute()">Add to database</button>
         </div>
         <div id="save-msg" style="font-size:12px; margin-top:8px; display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Save circumnavigation to database (shown only for fresh, unsaved results) -->
+    <div id="circum-save-section" style="display:none; margin-top:4px;">
+      <div class="card" style="border-color:#238636;">
+        <div class="card-label" style="color:#3fb950;">Add to database</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <input type="text" id="circum-route-name-input"
+                 placeholder="Route name (e.g. Ireland circumnavigation)"
+                 style="flex:1; min-width:180px;"
+                 autocomplete="off" spellcheck="false">
+          <button class="btn-primary" id="btn-save-circum" onclick="saveCircum()">Add to database</button>
+        </div>
+        <div id="circum-save-msg" style="font-size:12px; margin-top:8px; display:none;"></div>
       </div>
     </div>
 
@@ -286,6 +301,7 @@ const S = {
   endMarker:        null,
   lastResult:       null,   // last API response, used by saveRoute()
   lastCoords:       null,   // {start, end} objects from parseCoord
+  lastCircumResult: null,   // last circumnavigation result, used by saveCircum()
 };
 
 // ── Coord parsing ──────────────────────────────────────────────────────────────
@@ -475,6 +491,7 @@ function showShoreResults({ start, end, km, mi, coords, seaRouted, aiRouted, glo
   document.getElementById('legs-card').style.display = 'none';
 
   // Show save section only for fresh (not yet saved) results
+  document.getElementById('circum-save-section').style.display = 'none';
   const saveSection = document.getElementById('save-section');
   if (S.serverOnline && !fromDb && !swimName) {
     saveSection.style.display = 'block';
@@ -668,6 +685,20 @@ function showCircumResults(data) {
   document.getElementById('dl-btn-wrap').innerHTML =
     `<button class="btn-secondary dl-btn" style="margin-top:10px;font-size:12px"
              onclick="downloadWaypoints('${slug}')">Download locked-${slug}-waypoints.json</button>`;
+
+  // Store result for save and show circum save section for fresh results
+  document.getElementById('save-section').style.display = 'none';
+  S.lastCircumResult = data;
+  const circumSaveSection = document.getElementById('circum-save-section');
+  if (S.serverOnline && !data.precomputed && !data.from_db) {
+    circumSaveSection.style.display = 'block';
+    document.getElementById('circum-save-msg').style.display = 'none';
+    document.getElementById('btn-save-circum').disabled = false;
+    document.getElementById('circum-route-name-input').disabled = false;
+    document.getElementById('circum-route-name-input').value = '';
+  } else {
+    circumSaveSection.style.display = 'none';
+  }
 
   document.getElementById('results').style.display = 'block';
   document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1077,16 +1108,68 @@ async function saveRoute() {
   }
 }
 
+async function saveCircum() {
+  const nameEl  = document.getElementById('circum-route-name-input');
+  const msgEl   = document.getElementById('circum-save-msg');
+  const btnEl   = document.getElementById('btn-save-circum');
+  const name    = nameEl.value.trim();
+
+  msgEl.style.display = 'none';
+  if (!name) {
+    msgEl.textContent   = 'Enter a route name first.';
+    msgEl.style.color   = '#f85149';
+    msgEl.style.display = 'block';
+    return;
+  }
+  if (!S.lastCircumResult) return;
+
+  const landmass = document.getElementById('circum-name').value.trim();
+  btnEl.disabled = true;
+  try {
+    const res = await apiFetch('/api/save-circumnavigation', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        landmass,
+        distance_km:    S.lastCircumResult.total_distance_km,
+        distance_miles: S.lastCircumResult.total_distance_miles,
+        waypoints:      S.lastCircumResult.waypoints_used,
+        path:           S.lastCircumResult.route_coordinates || [],
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('result-type-label').textContent =
+      `Circumnavigation distance (saved: ${name})`;
+    document.getElementById('result-note').textContent =
+      'WOWSA verified route - saved to database.';
+
+    msgEl.textContent   = `Saved as "${name}"`;
+    msgEl.style.color   = '#3fb950';
+    msgEl.style.display = 'block';
+    nameEl.disabled     = true;
+  } catch (e) {
+    msgEl.textContent   = 'Save failed: ' + e.message;
+    msgEl.style.color   = '#f85149';
+    msgEl.style.display = 'block';
+    btnEl.disabled      = false;
+  }
+}
+
 // ── Utilities ──────────────────────────────────────────────────────────────────
 function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
 function clearResults() {
-  document.getElementById('results').style.display      = 'none';
-  document.getElementById('map-wrap').style.display     = 'none';
-  document.getElementById('save-section').style.display = 'none';
-  document.getElementById('shore-error').style.display  = 'none';
-  document.getElementById('circum-error').style.display = 'none';
-  S.lastResult = null;
-  S.lastCoords = null;
+  document.getElementById('results').style.display             = 'none';
+  document.getElementById('map-wrap').style.display            = 'none';
+  document.getElementById('save-section').style.display        = 'none';
+  document.getElementById('circum-save-section').style.display = 'none';
+  document.getElementById('shore-error').style.display         = 'none';
+  document.getElementById('circum-error').style.display        = 'none';
+  S.lastResult      = null;
+  S.lastCoords      = null;
+  S.lastCircumResult = null;
 }
 function setBusy(which, busy) {
   const map = {
