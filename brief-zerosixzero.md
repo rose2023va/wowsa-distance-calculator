@@ -60,7 +60,9 @@ The leg routing now uses GLOBE A* - each segment between consecutive waypoints f
 
 **Map integration.** ZeroSixZero's existing map already shows the swimmer's GPS track. The second layer - WOWSA's official route - goes on the same map. Both paths on one view: what the swimmer actually swam versus what the standardized route is.
 
-**Input on circumnavigation.** This is the part we most want to discuss. The waypoint placement and leg routing close to shore is where accuracy breaks down. Specifically: we need the offshore path between consecutive waypoints to follow the water accurately close to the coastline, and the waypoint placement itself to land consistently at a defined distance from shore regardless of how complex or irregular the coastline is. If you have worked on something similar or know of an approach that holds up for tight coastal geometry, we would like to hear how you have handled it.
+**Input on circumnavigation.** The waypoint placement close to shore is where accuracy still breaks down. Specifically: we need the waypoint placement itself to land consistently at a defined distance from shore regardless of how complex or irregular the coastline is. If you have worked on something similar or know of an approach that holds up for tight coastal geometry, we would like to hear how you have handled it.
+
+**Multi-island circumnavigation.** Some WOWSA-ratified swims go around more than one island in a single route - not one island at a time, but a connected loop that takes in multiple landmasses. The current tool handles a single named landmass. We need a way to define a route that circumnavigates several islands as one course - a defined order, a consistent offshore distance around each, and connecting legs between them. We have not designed the input model for this yet and would value input on how to structure it before building.
 
 ---
 
