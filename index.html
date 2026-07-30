@@ -549,7 +549,7 @@ async function proposeWaypoints() {
         direction: S.direction,
         count:     parseInt(document.getElementById('circum-count').value) || 30,
       }),
-    }, 90000);
+    }, 180000);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
