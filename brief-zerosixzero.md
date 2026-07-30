@@ -88,6 +88,5 @@ All files are in the [wowsa-distance-calculator](https://github.com/rose2023va/w
 | [map_output.py](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/map_output.py) | Shared Google Maps HTML output used by the CLI tools. Generates a self-contained map file and opens it in the browser. |
 | [METHODOLOGY.md](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/METHODOLOGY.md) | Documents the calculation methodology and defensibility criteria. |
 | [README.md](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/README.md) | Setup, API reference, and deployment instructions. |
-| [route_ireland.json](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/route_ireland.json) | Pre-computed verified route for Ireland circumnavigation. |
 | [requirements.txt](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/requirements.txt) | Python dependencies including global-land-mask for GLOBE routing. |
 | [Procfile](https://github.com/rose2023va/wowsa-distance-calculator/blob/main/Procfile) | Railway deployment command. |
