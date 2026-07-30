@@ -622,9 +622,10 @@ async function runCircum() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ waypoints: S.waypoints }),
-    });
+    }, 300000);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+    if (!data.waypoints_used) data.waypoints_used = S.waypoints;
     showCircumResults(data);
   } catch (e) {
     showErr(errEl, 'Error: ' + e.message);
